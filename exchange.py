@@ -1,24 +1,11 @@
 import ccxt
 
 # ===============================
-# EXCHANGE CONFIG - BYBIT TESTNET
+# KUCOIN EXCHANGE (RECOMENDADO)
 # ===============================
 
-exchange = ccxt.bybit({
+exchange = ccxt.kucoin({
     'enableRateLimit': True,
-
-    # ⚡ usamos SPOT
-    'options': {
-        'defaultType': 'spot'
-    },
-
-    # 🔥 TESTNET (modo simulación)
-    'urls': {
-        'api': {
-            'public': 'https://api-testnet.bybit.com',
-            'private': 'https://api-testnet.bybit.com'
-        }
-    }
 })
 
 
@@ -27,9 +14,7 @@ exchange = ccxt.bybit({
 # ===============================
 
 def obtener_datos(symbol, timeframe):
-    """
-    Descarga velas OHLCV desde Bybit Testnet
-    """
+
     ohlcv = exchange.fetch_ohlcv(
         symbol,
         timeframe=timeframe,
