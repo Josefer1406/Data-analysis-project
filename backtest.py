@@ -1,13 +1,18 @@
+import ccxt
 import pandas as pd
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
-
 from config import SYMBOLS, TIMEFRAME, CAPITAL_INICIAL
-from exchange import exchange   # ✅ usamos el exchange central
 
 # ===============================
-# VARIABLES
+# CONEXIÓN AL EXCHANGE (BYBIT)
 # ===============================
+exchange = ccxt.bybit({
+    'enableRateLimit': True,
+    'options': {
+        'defaultType': 'spot'
+    }
+})
 
 capital = CAPITAL_INICIAL
 position = 0
@@ -15,21 +20,23 @@ precio_entrada = 0
 
 
 # ===============================
-# DESCARGAR DATOS HISTÓRICOS
+# DESCARGAR DATA HISTÓRICA
 # ===============================
-
 def get_historical_data(symbol):
 
     print(f"Descargando datos de {symbol}...")
 
-    ohlcv = exchange.fetch_ohlcv(symbol, TIMEFRAME, limit=500)
+    ohlcv = exchange.fetch_ohlcv(
+        symbol,
+        timeframe=TIMEFRAME,
+        limit=500
+    )
 
     df = pd.DataFrame(
         ohlcv,
         columns=["time", "open", "high", "low", "close", "volume"]
     )
 
-    # INDICADORES
     df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
     df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
     df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
@@ -40,7 +47,6 @@ def get_historical_data(symbol):
 # ===============================
 # BACKTEST
 # ===============================
-
 def run_backtest(symbol):
 
     global capital, position, precio_entrada
@@ -58,9 +64,7 @@ def run_backtest(symbol):
         ema50 = row["ema50"]
         rsi = row["rsi"]
 
-        # ===============================
         # COMPRA
-        # ===============================
         if ema20 > ema50 and rsi < 35 and position == 0:
 
             monto = capital * 0.1
@@ -69,9 +73,7 @@ def run_backtest(symbol):
             precio_entrada = precio
             trades += 1
 
-        # ===============================
         # VENTA
-        # ===============================
         elif position > 0:
 
             ganancia = (precio - precio_entrada) / precio_entrada
@@ -79,10 +81,6 @@ def run_backtest(symbol):
             if rsi > 65 or ganancia >= 0.03 or ganancia <= -0.02:
                 capital += position * precio
                 position = 0
-
-    # ===============================
-    # RESULTADOS
-    # ===============================
 
     print("\n===== RESULTADO BACKTEST =====")
     print(f"Capital final: {capital:.2f} USDT")
@@ -94,7 +92,6 @@ def run_backtest(symbol):
 # ===============================
 # EJECUCIÓN
 # ===============================
-
 if __name__ == "__main__":
 
     for symbol in SYMBOLS:
