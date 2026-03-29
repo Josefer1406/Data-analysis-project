@@ -1,6 +1,5 @@
 import config
 import exchange
-import strategy
 
 def escanear_mercado():
 
@@ -8,13 +7,18 @@ def escanear_mercado():
 
     for symbol in config.CRYPTOS:
 
-        data = exchange.obtener_datos(symbol, config.TIMEFRAME)
+        precio = exchange.obtener_precio(symbol)
 
-        df = strategy.calcular_indicadores(data)
+        if precio is None:
+            continue
 
-        señal = strategy.generar_senal(df)
+        print(f"🔎 Analizando {symbol} | Precio: {precio}")
 
-        if señal != "HOLD":
-            oportunidades.append((symbol, señal))
+        # Estrategia SIMPLE (demo)
+        if precio > 0:
+            oportunidades.append({
+                "symbol": symbol,
+                "precio": precio
+            })
 
     return oportunidades

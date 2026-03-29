@@ -1,21 +1,20 @@
-# ===============================
-# CONFIGURACIÓN GENERAL BOT
-# ===============================
+# CONFIGURACIÓN GENERAL DEL BOT
 
-# CRIPTOS A ANALIZAR
+# Capital ficticio (paper trading)
+CAPITAL_USDT = 1000
+
+# Riesgo por operación (1%)
+RIESGO_POR_TRADE = 0.01
+
+# Tiempo entre ciclos (segundos)
+INTERVALO_CICLO = 60
+
+# Criptomonedas compatibles MULTI-EXCHANGE
 CRYPTOS = [
     "BTC/USDT",
     "ETH/USDT",
     "SOL/USDT",
     "XRP/USDT",
-    "ADA/USDT"
+    "ADA/USDT",
+    "DOGE/USDT"
 ]
-
-# TIMEFRAME
-TIMEFRAME = "5m"
-
-# CAPITAL SIMULADO
-CAPITAL_INICIAL = 1000
-
-# RIESGO POR OPERACIÓN
-RIESGO = 0.1

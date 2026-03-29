@@ -1,35 +1,15 @@
 import ccxt
 
-# ===============================
-# EXCHANGE CONFIG SEGURO
-# ===============================
+print("[EXCHANGE] Conectando a exchange público...")
 
-exchange = ccxt.kucoin({
-    'enableRateLimit': True,
-
-    # 🔥 evita congelamientos
-    'timeout': 15000,   # 15 segundos máximo
-
-    'options': {
-        'adjustForTimeDifference': True
-    }
+exchange = ccxt.okx({
+    "enableRateLimit": True,
 })
 
-
-# ===============================
-# OBTENER DATOS
-# ===============================
-
-def obtener_datos(symbol, timeframe):
-
+def obtener_precio(symbol):
     try:
-        ohlcv = exchange.fetch_ohlcv(
-            symbol,
-            timeframe=timeframe,
-            limit=100
-        )
-        return ohlcv
-
+        ticker = exchange.fetch_ticker(symbol)
+        return ticker["last"]
     except Exception as e:
         print(f"[EXCHANGE ERROR] {e}")
         return None
