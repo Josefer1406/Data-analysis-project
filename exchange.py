@@ -1,24 +1,35 @@
 import ccxt
 
 # ===============================
-# KUCOIN EXCHANGE (RECOMENDADO)
+# EXCHANGE CONFIG SEGURO
 # ===============================
 
 exchange = ccxt.kucoin({
     'enableRateLimit': True,
+
+    # 🔥 evita congelamientos
+    'timeout': 15000,   # 15 segundos máximo
+
+    'options': {
+        'adjustForTimeDifference': True
+    }
 })
 
 
 # ===============================
-# OBTENER DATOS DE MERCADO
+# OBTENER DATOS
 # ===============================
 
 def obtener_datos(symbol, timeframe):
 
-    ohlcv = exchange.fetch_ohlcv(
-        symbol,
-        timeframe=timeframe,
-        limit=100
-    )
+    try:
+        ohlcv = exchange.fetch_ohlcv(
+            symbol,
+            timeframe=timeframe,
+            limit=100
+        )
+        return ohlcv
 
-    return ohlcv
+    except Exception as e:
+        print(f"[EXCHANGE ERROR] {e}")
+        return None
