@@ -1,12 +1,17 @@
-import ccxt
 import pandas as pd
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
-from config import SYMBOLS, TIMEFRAME, CAPITAL_INICIAL
 
-exchange = ccxt.binance()
+from config import SYMBOLS, TIMEFRAME, CAPITAL_INICIAL
+from exchange import exchange   # ✅ IMPORTANTE
+
+
+# ===============================
+# OBTENER DATOS
+# ===============================
 
 def get_data(symbol):
+
     ohlcv = exchange.fetch_ohlcv(symbol, TIMEFRAME, limit=500)
 
     df = pd.DataFrame(
@@ -16,6 +21,10 @@ def get_data(symbol):
 
     return df
 
+
+# ===============================
+# ESTRATEGIA
+# ===============================
 
 def run_strategy(df, ema_fast, ema_slow, rsi_buy, rsi_sell):
 
@@ -30,10 +39,11 @@ def run_strategy(df, ema_fast, ema_slow, rsi_buy, rsi_sell):
     for i in range(50, len(df)):
 
         row = df.iloc[i]
-
         precio = row["close"]
 
+        # ===============================
         # COMPRA
+        # ===============================
         if (
             row["ema_fast"] > row["ema_slow"]
             and row["rsi"] < rsi_buy
@@ -44,7 +54,9 @@ def run_strategy(df, ema_fast, ema_slow, rsi_buy, rsi_sell):
             capital -= monto
             precio_entrada = precio
 
+        # ===============================
         # VENTA
+        # ===============================
         elif position > 0:
 
             ganancia = (precio - precio_entrada) / precio_entrada
@@ -55,6 +67,10 @@ def run_strategy(df, ema_fast, ema_slow, rsi_buy, rsi_sell):
 
     return capital
 
+
+# ===============================
+# OPTIMIZADOR
+# ===============================
 
 def optimize(symbol):
 
@@ -97,6 +113,10 @@ def optimize(symbol):
     print(f"RSI SELL: {mejor_config[3]}")
     print(f"Capital final: {mejor_resultado:.2f}")
 
+
+# ===============================
+# EJECUCIÓN
+# ===============================
 
 if __name__ == "__main__":
 
