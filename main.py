@@ -1,27 +1,26 @@
 import time
-import scanner
-import risk
-import config
+
+from services.scanner import escanear_mercado
+from core.risk import calcular_size
 
 print("🤖 BOT PROFESIONAL INICIADO")
 
 while True:
 
-    print("\n[AUTO BOT] Iniciando ciclo autónomo")
+    try:
 
-    oportunidades = scanner.escanear_mercado()
+        oportunidades = escanear_mercado()
 
-    for trade in oportunidades:
+        for symbol, precio in oportunidades:
 
-        symbol = trade["symbol"]
-        precio = trade["precio"]
+            size = calcular_size(precio)
 
-        size = risk.calcular_size(precio)
+            print(f"🚀 Oportunidad detectada")
+            print(symbol, precio, size)
 
-        print(f"✅ Señal detectada -> {symbol}")
-        print(f"Precio: {precio}")
-        print(f"Tamaño posición: {size}")
+        print("⏳ Esperando próximo ciclo...")
+        time.sleep(300)
 
-    print("[AUTO BOT] Esperando próximo ciclo...")
-
-    time.sleep(config.INTERVALO_CICLO)
+    except Exception as e:
+        print("ERROR:", e)
+        time.sleep(60)
