@@ -14,5 +14,12 @@ CRYPTOS = [
 MAX_POSICIONES = 3
 CYCLE_TIME = 60
 
+# PARAMETROS OPTIMIZADOS
+EMA_FAST = 20
+EMA_SLOW = 60
+
+RSI_LOW = 35
+RSI_HIGH = 70
+
 # Parámetros base (se ajustan dinámicamente)
 MIN_SCORE_BASE = 3

@@ -1,18 +1,24 @@
+import ccxt
 import pandas as pd
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
 
-from config import SYMBOLS, TIMEFRAME, CAPITAL_INICIAL
-from exchange import exchange   # ✅ IMPORTANTE
+# =========================
+# CONFIG
+# =========================
+CAPITAL_INICIAL = 1000
+TIMEFRAME = "5m"
+SYMBOL = "BTC/USDT"
 
+exchange = ccxt.okx({
+    "enableRateLimit": True
+})
 
-# ===============================
-# OBTENER DATOS
-# ===============================
-
-def get_data(symbol):
-
-    ohlcv = exchange.fetch_ohlcv(symbol, TIMEFRAME, limit=500)
+# =========================
+# DATA
+# =========================
+def get_data():
+    ohlcv = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=1000)
 
     df = pd.DataFrame(
         ohlcv,
@@ -22,103 +28,89 @@ def get_data(symbol):
     return df
 
 
-# ===============================
-# ESTRATEGIA
-# ===============================
-
-def run_strategy(df, ema_fast, ema_slow, rsi_buy, rsi_sell):
+# =========================
+# BACKTEST PARAMETRICO
+# =========================
+def backtest(df, ema_fast, ema_slow, rsi_low, rsi_high):
 
     capital = CAPITAL_INICIAL
-    position = 0
-    precio_entrada = 0
+    posicion = None
 
     df["ema_fast"] = EMAIndicator(df["close"], window=ema_fast).ema_indicator()
     df["ema_slow"] = EMAIndicator(df["close"], window=ema_slow).ema_indicator()
     df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
 
-    for i in range(50, len(df)):
+    for i in range(ema_slow, len(df)):
 
         row = df.iloc[i]
         precio = row["close"]
 
-        # ===============================
-        # COMPRA
-        # ===============================
-        if (
-            row["ema_fast"] > row["ema_slow"]
-            and row["rsi"] < rsi_buy
-            and position == 0
-        ):
-            monto = capital * 0.1
-            position = monto / precio
-            capital -= monto
-            precio_entrada = precio
+        # entrada
+        if posicion is None:
 
-        # ===============================
-        # VENTA
-        # ===============================
-        elif position > 0:
+            if row["ema_fast"] > row["ema_slow"] and rsi_low < row["rsi"] < rsi_high:
 
-            ganancia = (precio - precio_entrada) / precio_entrada
+                size = (capital * 0.05) / precio
 
-            if row["rsi"] > rsi_sell or ganancia >= 0.03 or ganancia <= -0.02:
-                capital += position * precio
-                position = 0
+                posicion = {
+                    "precio": precio,
+                    "size": size
+                }
+
+        # salida
+        else:
+            pnl = (precio - posicion["precio"]) / posicion["precio"]
+
+            if pnl >= 0.04 or pnl <= -0.02:
+
+                capital += (precio - posicion["precio"]) * posicion["size"]
+                posicion = None
 
     return capital
 
 
-# ===============================
+# =========================
 # OPTIMIZADOR
-# ===============================
+# =========================
+def optimize():
 
-def optimize(symbol):
+    df = get_data()
 
-    print(f"\n🔎 Optimizando {symbol}")
+    best_result = 0
+    best_params = None
 
-    df = get_data(symbol)
-
-    mejor_resultado = 0
-    mejor_config = None
+    print("🔎 Iniciando optimización...\n")
 
     for ema_fast in [10, 15, 20]:
         for ema_slow in [40, 50, 60]:
-            for rsi_buy in [30, 35, 40]:
-                for rsi_sell in [60, 65, 70]:
+            for rsi_low in [30, 35, 40]:
+                for rsi_high in [60, 65, 70]:
 
                     if ema_fast >= ema_slow:
                         continue
 
-                    capital_final = run_strategy(
+                    capital_final = backtest(
                         df.copy(),
                         ema_fast,
                         ema_slow,
-                        rsi_buy,
-                        rsi_sell,
+                        rsi_low,
+                        rsi_high
                     )
 
-                    if capital_final > mejor_resultado:
-                        mejor_resultado = capital_final
-                        mejor_config = (
-                            ema_fast,
-                            ema_slow,
-                            rsi_buy,
-                            rsi_sell,
-                        )
+                    print(f"EMA {ema_fast}/{ema_slow} | RSI {rsi_low}-{rsi_high} → {capital_final:.2f}")
 
-    print("✅ Mejor configuración encontrada:")
-    print(f"EMA FAST: {mejor_config[0]}")
-    print(f"EMA SLOW: {mejor_config[1]}")
-    print(f"RSI BUY: {mejor_config[2]}")
-    print(f"RSI SELL: {mejor_config[3]}")
-    print(f"Capital final: {mejor_resultado:.2f}")
+                    if capital_final > best_result:
+                        best_result = capital_final
+                        best_params = (ema_fast, ema_slow, rsi_low, rsi_high)
 
+    print("\n🏆 ===== MEJOR CONFIGURACIÓN =====")
+    print(f"EMA FAST: {best_params[0]}")
+    print(f"EMA SLOW: {best_params[1]}")
+    print(f"RSI LOW: {best_params[2]}")
+    print(f"RSI HIGH: {best_params[3]}")
+    print(f"Capital final: {best_result:.2f}")
+    print("=================================\n")
 
-# ===============================
-# EJECUCIÓN
-# ===============================
 
 if __name__ == "__main__":
-
-    for symbol in SYMBOLS:
-        optimize(symbol)
+    optimize()
