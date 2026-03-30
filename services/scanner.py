@@ -1,6 +1,9 @@
 from data.exchange import obtener_datos
-from core.strategy import aplicar_estrategia, evaluar
+from ta.trend import EMAIndicator
+from ta.momentum import RSIIndicator
+import pandas as pd
 import config
+
 
 def escanear_mercado():
 
@@ -10,13 +13,20 @@ def escanear_mercado():
 
         print(f"Escaneando {symbol}")
 
-        df = obtener_datos(symbol)
+        ohlcv = obtener_datos(symbol, config.TIMEFRAME)
 
-        df = aplicar_estrategia(df)
+        df = pd.DataFrame(
+            ohlcv,
+            columns=["time","open","high","low","close","volume"]
+        )
 
-        señal = evaluar(df)
+        df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
+        df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
+        df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
 
-        if señal == "BUY":
-            oportunidades.append((symbol, df["close"].iloc[-1]))
+        last = df.iloc[-1]
+
+        if last["ema20"] > last["ema50"] and last["rsi"] < 40:
+            oportunidades.append((symbol, last["close"]))
 
     return oportunidades
