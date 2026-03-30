@@ -8,75 +8,94 @@ from core.risk import calcular_size
 import portfolio
 import logger
 
-print("🤖 BOT EXPERTO INICIADO")
+print("🤖 BOT EXPERTO MULTI-TRADE INICIADO")
 
 while True:
 
     try:
-
+        # =========================
+        # 1. FILTRO GLOBAL
+        # =========================
         if not mercado_favorable():
-            print("⛔ No operar")
-            time.sleep(60)
+            print("⛔ Mercado no favorable")
+            time.sleep(config.CYCLE_TIME)
             continue
 
+        # =========================
+        # 2. ANALIZAR TODAS LAS CRYPTOS
+        # =========================
         ranking = []
 
         for symbol in config.CRYPTOS:
+            try:
+                score, precio = analizar(symbol)
+                ranking.append((symbol, score, precio))
+            except Exception as e:
+                print(f"Error analizando {symbol}: {e}")
 
-            score, precio = analizar(symbol)
+        # =========================
+        # 3. ORDENAR POR SCORE
+        # =========================
+        ranking.sort(key=lambda x: x[1], reverse=True)
 
-            ranking.append((symbol, score, precio))
+        # =========================
+        # 4. MOSTRAR TOP
+        # =========================
+        top_cryptos = ranking[:config.MAX_POSICIONES]
 
-        # 🔥 ORDENAR MEJORES
-      # ORDENAR POR SCORE
-ranking.sort(key=lambda x: x[1], reverse=True)
+        print("\n🏆 Top oportunidades:")
 
-# TOMAR LAS MEJORES SEGÚN LIMITE
-top_cryptos = ranking[:config.MAX_POSICIONES]
+        for symbol, score, precio in top_cryptos:
+            print(f"{symbol} | Score {score} | Precio {precio}")
 
-print("🏆 Top oportunidades:")
+        # =========================
+        # 5. GESTIÓN DE POSICIONES (SALIDAS)
+        # =========================
+        for symbol in list(portfolio.posiciones.keys()):
+            try:
+                # usamos el precio más reciente del ranking
+                precio_actual = next(
+                    (p for s, sc, p in ranking if s == symbol),
+                    None
+                )
 
-for symbol, score, precio in top_cryptos:
-    print(f"{symbol} | Score {score}")
+                if precio_actual is None:
+                    continue
 
-    # 🔴 SALIDAS
-    if symbol in portfolio.posiciones:
-        if portfolio.evaluar_salida(symbol, precio):
-            pnl = portfolio.cerrar_posicion(symbol, precio)
-            logger.log_trade(symbol, "SELL", precio, 0, pnl)
-            print(f"🔴 Cierre {symbol} PnL {pnl}")
+                if portfolio.evaluar_salida(symbol, precio_actual):
+                    pnl = portfolio.cerrar_posicion(symbol, precio_actual)
+                    logger.log_trade(symbol, "SELL", precio_actual, 0, pnl)
+                    print(f"🔴 Cierre {symbol} | PnL: {pnl}")
 
-    # 🟢 ENTRADAS
-    if score >= 2:
-        size = calcular_size(precio)
+            except Exception as e:
+                print(f"Error cierre {symbol}: {e}")
 
-        if portfolio.abrir_posicion(symbol, precio, size):
-            logger.log_trade(symbol, "BUY", precio, size, 0)
-            print(f"🟢 Compra {symbol}")
+        # =========================
+        # 6. ENTRADAS (MULTI-TRADE)
+        # =========================
+        for symbol, score, precio in top_cryptos:
 
-        print(f"🏆 Mejor activo: {symbol} | Score {score}")
+            try:
+                if score >= 2:
 
-        # 🔴 SALIDAS
-        for s in list(portfolio.posiciones.keys()):
-            if portfolio.evaluar_salida(s, precio):
-                pnl = portfolio.cerrar_posicion(s, precio)
-                logger.log_trade(s, "SELL", precio, 0, pnl)
-                print(f"🔴 Cierre {s} PnL {pnl}")
+                    size = calcular_size(precio)
 
-        # 🟢 ENTRADA
-        if score >= 2:
+                    if portfolio.abrir_posicion(symbol, precio, size):
+                        logger.log_trade(symbol, "BUY", precio, size, 0)
+                        print(f"🟢 Compra {symbol}")
 
-            size = calcular_size(precio)
+            except Exception as e:
+                print(f"Error compra {symbol}: {e}")
 
-            if portfolio.abrir_posicion(symbol, precio, size):
-                logger.log_trade(symbol, "BUY", precio, size, 0)
-                print(f"🟢 Compra {symbol}")
-
-        print(f"💰 Capital: {portfolio.capital}")
-        print("⏳ Esperando...\n")
+        # =========================
+        # 7. ESTADO DEL PORTAFOLIO
+        # =========================
+        print(f"\n💰 Capital actual: {portfolio.capital}")
+        print(f"📊 Posiciones abiertas: {list(portfolio.posiciones.keys())}")
+        print("⏳ Esperando próximo ciclo...\n")
 
         time.sleep(config.CYCLE_TIME)
 
     except Exception as e:
-        print("ERROR:", e)
+        print(f"ERROR GENERAL: {e}")
         time.sleep(10)
