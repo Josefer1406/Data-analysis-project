@@ -2,7 +2,6 @@ from data.exchange import obtener_datos
 from ta.trend import EMAIndicator
 
 def mercado_favorable():
-
     print("🌎 Analizando BTC...")
 
     df = obtener_datos("BTC/USDT")
@@ -13,9 +12,8 @@ def mercado_favorable():
     last = df.iloc[-1]
 
     if last["ema50"] > last["ema200"]:
-        print("✅ Mercado alcista")
+        print("🚀 Mercado alcista")
         return "ALCISTA"
-
     else:
-        print("⚠️ Mercado débil (se permite operar con cautela)")
+        print("⚠️ Mercado débil")
         return "DEBIL"

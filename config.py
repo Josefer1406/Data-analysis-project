@@ -1,7 +1,5 @@
-# config.py
-
 CAPITAL_INICIAL = 1000
-RIESGO_POR_TRADE = 0.05
+RIESGO_POR_TRADE = 0.03
 
 TIMEFRAME = "5m"
 
@@ -13,5 +11,8 @@ CRYPTOS = [
     "ADA/USDT"
 ]
 
-MAX_POSICIONES = 2
+MAX_POSICIONES = 3
 CYCLE_TIME = 60
+
+# Parámetros base (se ajustan dinámicamente)
+MIN_SCORE_BASE = 3

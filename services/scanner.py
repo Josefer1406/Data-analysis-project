@@ -14,10 +14,22 @@ def analizar(symbol):
 
     score = 0
 
+    # tendencia
     if last["ema20"] > last["ema50"]:
         score += 1
 
-    if last["rsi"] < 40:
+    # momentum
+    if 30 < last["rsi"] < 50:
+        score += 1
+
+    # fuerza
+    fuerza = abs(last["ema20"] - last["ema50"]) / last["close"]
+    if fuerza > 0.01:
+        score += 1
+
+    # volumen
+    vol_prom = df["volume"].rolling(20).mean().iloc[-1]
+    if last["volume"] > vol_prom:
         score += 1
 
     return score, last["close"]

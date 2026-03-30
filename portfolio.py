@@ -7,7 +7,6 @@ STOP_LOSS = -0.02
 TAKE_PROFIT = 0.05
 
 def abrir_posicion(symbol, precio, size):
-
     global capital
 
     if symbol in posiciones:
@@ -23,16 +22,11 @@ def abrir_posicion(symbol, precio, size):
 
     capital -= costo
 
-    posiciones[symbol] = {
-        "precio": precio,
-        "size": size
-    }
-
+    posiciones[symbol] = {"precio": precio, "size": size}
     return True
 
 
 def cerrar_posicion(symbol, precio):
-
     global capital
 
     pos = posiciones[symbol]
@@ -47,12 +41,8 @@ def cerrar_posicion(symbol, precio):
 
 
 def evaluar_salida(symbol, precio):
-
     pos = posiciones[symbol]
 
     pnl = (precio - pos["precio"]) / pos["precio"]
 
-    if pnl <= STOP_LOSS or pnl >= TAKE_PROFIT:
-        return True
-
-    return False
+    return pnl <= STOP_LOSS or pnl >= TAKE_PROFIT

@@ -7,101 +7,59 @@ from core.risk import calcular_size
 
 import portfolio
 import logger
+import adaptive
 
-print("🤖 BOT EXPERTO MULTI-TRADE INICIADO")
+print("🤖 BOT ELITE INICIADO")
 
 while True:
 
     try:
-        # =========================
-        # 1. ANALIZAR MERCADO GLOBAL
-        # =========================
-        estado_mercado = mercado_favorable()
+        estado = mercado_favorable()
 
-        if estado_mercado == "ALCISTA":
-            MIN_SCORE = 2
-            print("🚀 Modo agresivo")
+        # IA SIMPLE (adaptive)
+        MIN_SCORE = adaptive.calcular_min_score()
 
-        else:
-            MIN_SCORE = 3
-            print("🛑 Modo conservador")
+        print(f"🧠 MIN_SCORE dinámico: {MIN_SCORE}")
 
-        # =========================
-        # 2. ANALIZAR TODAS LAS CRYPTOS
-        # =========================
         ranking = []
 
         for symbol in config.CRYPTOS:
-            try:
-                score, precio = analizar(symbol)
-                ranking.append((symbol, score, precio))
-            except Exception as e:
-                print(f"Error analizando {symbol}: {e}")
+            score, precio = analizar(symbol)
+            ranking.append((symbol, score, precio))
 
-        if not ranking:
-            print("⚠️ No hay datos de mercado")
-            time.sleep(config.CYCLE_TIME)
-            continue
-
-        # =========================
-        # 3. ORDENAR POR SCORE
-        # =========================
         ranking.sort(key=lambda x: x[1], reverse=True)
 
-        top_cryptos = ranking[:config.MAX_POSICIONES]
+        top = ranking[:config.MAX_POSICIONES]
 
-        print("\n🏆 Top oportunidades:")
+        print("\n🏆 Ranking:")
 
-        for symbol, score, precio in top_cryptos:
-            print(f"{symbol} | Score {score} | Precio {precio}")
+        for s, sc, p in top:
+            print(f"{s} | Score {sc}")
 
-        # =========================
-        # 4. GESTIÓN DE SALIDAS
-        # =========================
-        for symbol in list(portfolio.posiciones.keys()):
-            try:
-                precio_actual = next(
-                    (p for s, sc, p in ranking if s == symbol),
-                    None
-                )
+        # SALIDAS
+        for s in list(portfolio.posiciones.keys()):
+            precio_actual = next((p for sym, sc, p in ranking if sym == s), None)
 
-                if precio_actual is None:
-                    continue
+            if precio_actual and portfolio.evaluar_salida(s, precio_actual):
+                pnl = portfolio.cerrar_posicion(s, precio_actual)
+                logger.log_trade(s, "SELL", precio_actual, 0, pnl)
+                print(f"🔴 Cierre {s} PnL {pnl}")
 
-                if portfolio.evaluar_salida(symbol, precio_actual):
-                    pnl = portfolio.cerrar_posicion(symbol, precio_actual)
-                    logger.log_trade(symbol, "SELL", precio_actual, 0, pnl)
-                    print(f"🔴 Cierre {symbol} | PnL: {pnl}")
+        # ENTRADAS
+        for s, sc, p in top:
+            if sc >= MIN_SCORE:
+                size = calcular_size(p)
 
-            except Exception as e:
-                print(f"Error cierre {symbol}: {e}")
+                if portfolio.abrir_posicion(s, p, size):
+                    logger.log_trade(s, "BUY", p, size, 0)
+                    print(f"🟢 Compra {s}")
 
-        # =========================
-        # 5. ENTRADAS MULTI-TRADE
-        # =========================
-        for symbol, score, precio in top_cryptos:
-
-            try:
-                if score >= MIN_SCORE:
-
-                    size = calcular_size(precio)
-
-                    if portfolio.abrir_posicion(symbol, precio, size):
-                        logger.log_trade(symbol, "BUY", precio, size, 0)
-                        print(f"🟢 Compra {symbol}")
-
-            except Exception as e:
-                print(f"Error compra {symbol}: {e}")
-
-        # =========================
-        # 6. ESTADO FINAL
-        # =========================
-        print(f"\n💰 Capital actual: {portfolio.capital}")
-        print(f"📊 Posiciones abiertas: {list(portfolio.posiciones.keys())}")
-        print("⏳ Esperando próximo ciclo...\n")
+        print(f"\n💰 Capital: {portfolio.capital}")
+        print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+        print("⏳ Esperando...\n")
 
         time.sleep(config.CYCLE_TIME)
 
     except Exception as e:
-        print(f"ERROR GENERAL: {e}")
+        print("ERROR:", e)
         time.sleep(10)
