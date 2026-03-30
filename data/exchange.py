@@ -1,24 +1,25 @@
 import ccxt
+import pandas as pd
+import config
 
-# ==========================
-# EXCHANGE CONFIG
-# ==========================
-
-exchange = ccxt.okx({
-    "enableRateLimit": True
+exchange = ccxt.bybit({
+    "enableRateLimit": True,
+    "options": {
+        "defaultType": "spot"
+    }
 })
 
-
-# ==========================
-# OBTENER DATOS MERCADO
-# ==========================
-
-def obtener_datos(symbol, timeframe="5m"):
+def obtener_datos(symbol):
 
     ohlcv = exchange.fetch_ohlcv(
         symbol,
-        timeframe=timeframe,
+        timeframe=config.TIMEFRAME,
         limit=100
     )
 
-    return ohlcv
+    df = pd.DataFrame(
+        ohlcv,
+        columns=["time","open","high","low","close","volume"]
+    )
+
+    return df

@@ -1,45 +1,46 @@
 import time
 import config
-from services import scanner
-from filters.market_filter import mercado_favorable
-from core import risk
 
-print("🤖 BOT HEDGE FUND INICIADO")
+from services.scanner import escanear
+from core.risk import calcular_size
+import portfolio
+import logger
 
+print("🤖 BOT PAPER TRADING REAL INICIADO")
 
 while True:
 
     try:
 
-        # =========================
-        # FILTRO GLOBAL
-        # =========================
-        if not mercado_favorable():
-            print("⏳ Mercado no favorable")
-            time.sleep(300)
-            continue
+        for symbol in config.CRYPTOS:
 
-        # =========================
-        # SCANNER
-        # =========================
-        oportunidades = scanner.escanear_mercado()
+            signal, precio = escanear(symbol)
 
-        if not oportunidades:
-            print("Sin oportunidades")
-        else:
-            print("🔥 Oportunidades detectadas:")
+            if signal == "BUY":
 
-            for symbol, precio in oportunidades:
+                size = calcular_size(precio)
 
-                size = risk.calcular_size(precio)
+                if portfolio.abrir_posicion(symbol, precio, size):
 
-                print(
-                    f"TRADE -> {symbol} | Precio {precio} | Size {size}"
-                )
+                    print(f"🟢 COMPRA {symbol} {precio}")
 
-        print("⏳ Esperando próximo ciclo...")
-        time.sleep(300)
+                    logger.log_trade(symbol, "BUY", precio, size, 0)
+
+            elif signal == "SELL":
+
+                pnl = portfolio.cerrar_posicion(symbol, precio)
+
+                if pnl != 0:
+
+                    print(f"🔴 VENTA {symbol} PnL: {pnl}")
+
+                    logger.log_trade(symbol, "SELL", precio, 0, pnl)
+
+        print(f"💰 Capital actual: {portfolio.capital}")
+        print("⏳ Esperando próximo ciclo...\n")
+
+        time.sleep(config.CYCLE_TIME)
 
     except Exception as e:
-        print(f"Error general: {e}")
-        time.sleep(60)
+        print("ERROR:", e)
+        time.sleep(10)
