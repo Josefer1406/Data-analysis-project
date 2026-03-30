@@ -28,11 +28,31 @@ while True:
             ranking.append((symbol, score, precio))
 
         # 🔥 ORDENAR MEJORES
-        ranking.sort(key=lambda x: x[1], reverse=True)
+      # ORDENAR POR SCORE
+ranking.sort(key=lambda x: x[1], reverse=True)
 
-        mejor = ranking[0]
+# TOMAR LAS MEJORES SEGÚN LIMITE
+top_cryptos = ranking[:config.MAX_POSICIONES]
 
-        symbol, score, precio = mejor
+print("🏆 Top oportunidades:")
+
+for symbol, score, precio in top_cryptos:
+    print(f"{symbol} | Score {score}")
+
+    # 🔴 SALIDAS
+    if symbol in portfolio.posiciones:
+        if portfolio.evaluar_salida(symbol, precio):
+            pnl = portfolio.cerrar_posicion(symbol, precio)
+            logger.log_trade(symbol, "SELL", precio, 0, pnl)
+            print(f"🔴 Cierre {symbol} PnL {pnl}")
+
+    # 🟢 ENTRADAS
+    if score >= 2:
+        size = calcular_size(precio)
+
+        if portfolio.abrir_posicion(symbol, precio, size):
+            logger.log_trade(symbol, "BUY", precio, size, 0)
+            print(f"🟢 Compra {symbol}")
 
         print(f"🏆 Mejor activo: {symbol} | Score {score}")
 
