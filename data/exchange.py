@@ -2,9 +2,8 @@ import ccxt
 import pandas as pd
 import config
 
-exchange = ccxt.bybit({
-    "enableRateLimit": True,
-    "options": {"defaultType": "spot"}
+exchange = ccxt.okx({
+    "enableRateLimit": True
 })
 
 def obtener_datos(symbol):
