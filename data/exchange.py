@@ -1,22 +1,24 @@
 import ccxt
-import pandas as pd
-import config
+
+# ==========================
+# EXCHANGE CONFIG
+# ==========================
 
 exchange = ccxt.okx({
     "enableRateLimit": True
 })
 
-def obtener_datos(symbol):
+
+# ==========================
+# OBTENER DATOS MERCADO
+# ==========================
+
+def obtener_datos(symbol, timeframe="5m"):
 
     ohlcv = exchange.fetch_ohlcv(
         symbol,
-        timeframe=config.TIMEFRAME,
-        limit=150
+        timeframe=timeframe,
+        limit=100
     )
 
-    df = pd.DataFrame(
-        ohlcv,
-        columns=["time","open","high","low","close","volume"]
-    )
-
-    return df
+    return ohlcv
