@@ -30,8 +30,6 @@ def abrir_posicion(symbol, precio, size):
 
 def revisar_posiciones(precio_actual):
 
-    global capital
-
     cerrar = []
 
     for symbol, pos in posiciones.items():
