@@ -3,41 +3,46 @@ import config
 
 from services.scanner import escanear
 from core.risk import calcular_size
+from filters.market_filter import mercado_favorable
+
 import portfolio
 import logger
 
-print("🤖 BOT PAPER TRADING REAL INICIADO")
+print("🤖 BOT OPTIMIZADO INICIADO")
 
 while True:
 
     try:
 
+        # 🚫 NO OPERAR SI MERCADO MALO
+        if not mercado_favorable():
+            print("❌ Mercado no favorable")
+            time.sleep(60)
+            continue
+
         for symbol in config.CRYPTOS:
 
             signal, precio = escanear(symbol)
 
+            # 📊 REVISAR SALIDAS
+            cerrar = portfolio.revisar_posiciones(precio)
+
+            for s in cerrar:
+                pnl = portfolio.cerrar_posicion(s, precio)
+                logger.log_trade(s, "SELL", precio, 0, pnl)
+                print(f"🔴 Cierre {s} PnL {pnl}")
+
+            # 🟢 ENTRADA
             if signal == "BUY":
 
                 size = calcular_size(precio)
 
                 if portfolio.abrir_posicion(symbol, precio, size):
-
-                    print(f"🟢 COMPRA {symbol} {precio}")
-
                     logger.log_trade(symbol, "BUY", precio, size, 0)
+                    print(f"🟢 Compra {symbol}")
 
-            elif signal == "SELL":
-
-                pnl = portfolio.cerrar_posicion(symbol, precio)
-
-                if pnl != 0:
-
-                    print(f"🔴 VENTA {symbol} PnL: {pnl}")
-
-                    logger.log_trade(symbol, "SELL", precio, 0, pnl)
-
-        print(f"💰 Capital actual: {portfolio.capital}")
-        print("⏳ Esperando próximo ciclo...\n")
+        print(f"💰 Capital: {portfolio.capital}")
+        print("⏳ Esperando...\n")
 
         time.sleep(config.CYCLE_TIME)
 
