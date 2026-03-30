@@ -14,7 +14,8 @@ def mercado_favorable():
 
     if last["ema50"] > last["ema200"]:
         print("✅ Mercado alcista")
-        return True
+        return "ALCISTA"
+
     else:
-        print("❌ Mercado bajista")
-        return False
+        print("⚠️ Mercado débil (se permite operar con cautela)")
+        return "DEBIL"

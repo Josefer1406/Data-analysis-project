@@ -14,12 +14,17 @@ while True:
 
     try:
         # =========================
-        # 1. FILTRO GLOBAL
+        # 1. ANALIZAR MERCADO GLOBAL
         # =========================
-        if not mercado_favorable():
-            print("⛔ Mercado no favorable")
-            time.sleep(config.CYCLE_TIME)
-            continue
+        estado_mercado = mercado_favorable()
+
+        if estado_mercado == "ALCISTA":
+            MIN_SCORE = 2
+            print("🚀 Modo agresivo")
+
+        else:
+            MIN_SCORE = 3
+            print("🛑 Modo conservador")
 
         # =========================
         # 2. ANALIZAR TODAS LAS CRYPTOS
@@ -33,14 +38,16 @@ while True:
             except Exception as e:
                 print(f"Error analizando {symbol}: {e}")
 
+        if not ranking:
+            print("⚠️ No hay datos de mercado")
+            time.sleep(config.CYCLE_TIME)
+            continue
+
         # =========================
         # 3. ORDENAR POR SCORE
         # =========================
         ranking.sort(key=lambda x: x[1], reverse=True)
 
-        # =========================
-        # 4. MOSTRAR TOP
-        # =========================
         top_cryptos = ranking[:config.MAX_POSICIONES]
 
         print("\n🏆 Top oportunidades:")
@@ -49,11 +56,10 @@ while True:
             print(f"{symbol} | Score {score} | Precio {precio}")
 
         # =========================
-        # 5. GESTIÓN DE POSICIONES (SALIDAS)
+        # 4. GESTIÓN DE SALIDAS
         # =========================
         for symbol in list(portfolio.posiciones.keys()):
             try:
-                # usamos el precio más reciente del ranking
                 precio_actual = next(
                     (p for s, sc, p in ranking if s == symbol),
                     None
@@ -71,12 +77,12 @@ while True:
                 print(f"Error cierre {symbol}: {e}")
 
         # =========================
-        # 6. ENTRADAS (MULTI-TRADE)
+        # 5. ENTRADAS MULTI-TRADE
         # =========================
         for symbol, score, precio in top_cryptos:
 
             try:
-                if score >= 2:
+                if score >= MIN_SCORE:
 
                     size = calcular_size(precio)
 
@@ -88,7 +94,7 @@ while True:
                 print(f"Error compra {symbol}: {e}")
 
         # =========================
-        # 7. ESTADO DEL PORTAFOLIO
+        # 6. ESTADO FINAL
         # =========================
         print(f"\n💰 Capital actual: {portfolio.capital}")
         print(f"📊 Posiciones abiertas: {list(portfolio.posiciones.keys())}")
