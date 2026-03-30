@@ -2,97 +2,109 @@ import ccxt
 import pandas as pd
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
-from config import SYMBOLS, TIMEFRAME, CAPITAL_INICIAL
 
-# ===============================
-# CONEXIÓN AL EXCHANGE (BYBIT)
-# ===============================
-exchange = ccxt.bybit({
-    'enableRateLimit': True,
-    'options': {
-        'defaultType': 'spot'
-    }
+# =========================
+# CONFIG
+# =========================
+CAPITAL_INICIAL = 1000
+RIESGO = 0.05
+STOP_LOSS = -0.02
+TAKE_PROFIT = 0.04
+TIMEFRAME = "5m"
+
+SYMBOL = "BTC/USDT"
+
+# =========================
+# EXCHANGE
+# =========================
+exchange = ccxt.okx({
+    "enableRateLimit": True
 })
 
-capital = CAPITAL_INICIAL
-position = 0
-precio_entrada = 0
-
-
-# ===============================
-# DESCARGAR DATA HISTÓRICA
-# ===============================
-def get_historical_data(symbol):
-
-    print(f"Descargando datos de {symbol}...")
-
-    ohlcv = exchange.fetch_ohlcv(
-        symbol,
-        timeframe=TIMEFRAME,
-        limit=500
-    )
+# =========================
+# DESCARGAR DATOS
+# =========================
+def get_data():
+    ohlcv = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=1000)
 
     df = pd.DataFrame(
         ohlcv,
-        columns=["time", "open", "high", "low", "close", "volume"]
+        columns=["time","open","high","low","close","volume"]
     )
-
-    df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
-    df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
-    df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
 
     return df
 
 
-# ===============================
+# =========================
 # BACKTEST
-# ===============================
-def run_backtest(symbol):
+# =========================
+def run_backtest():
 
-    global capital, position, precio_entrada
+    capital = CAPITAL_INICIAL
+    posicion = None
+    trades = []
 
-    df = get_historical_data(symbol)
+    df = get_data()
 
-    trades = 0
+    # indicadores
+    df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
+    df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
+    df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
 
     for i in range(50, len(df)):
 
         row = df.iloc[i]
-
         precio = row["close"]
-        ema20 = row["ema20"]
-        ema50 = row["ema50"]
-        rsi = row["rsi"]
 
-        # COMPRA
-        if ema20 > ema50 and rsi < 35 and position == 0:
+        # =========================
+        # ENTRADA
+        # =========================
+        if posicion is None:
 
-            monto = capital * 0.1
-            position = monto / precio
-            capital -= monto
-            precio_entrada = precio
-            trades += 1
+            if row["ema20"] > row["ema50"] and 30 < row["rsi"] < 50:
 
-        # VENTA
-        elif position > 0:
+                size = (capital * RIESGO) / precio
 
-            ganancia = (precio - precio_entrada) / precio_entrada
+                posicion = {
+                    "precio": precio,
+                    "size": size
+                }
 
-            if rsi > 65 or ganancia >= 0.03 or ganancia <= -0.02:
-                capital += position * precio
-                position = 0
+        # =========================
+        # SALIDA
+        # =========================
+        else:
 
-    print("\n===== RESULTADO BACKTEST =====")
-    print(f"Capital final: {capital:.2f} USDT")
-    print(f"Trades realizados: {trades}")
-    print(f"Ganancia total: {(capital/CAPITAL_INICIAL-1)*100:.2f}%")
-    print("==============================\n")
+            pnl = (precio - posicion["precio"]) / posicion["precio"]
+
+            if pnl <= STOP_LOSS or pnl >= TAKE_PROFIT:
+
+                ganancia = (precio - posicion["precio"]) * posicion["size"]
+                capital += ganancia
+
+                trades.append(ganancia)
+
+                posicion = None
+
+    # =========================
+    # RESULTADOS
+    # =========================
+    total_trades = len(trades)
+    pnl_total = sum(trades)
+
+    ganadoras = len([t for t in trades if t > 0])
+    perdedoras = len([t for t in trades if t <= 0])
+
+    win_rate = (ganadoras / total_trades) * 100 if total_trades > 0 else 0
+
+    print("\n📊 ===== BACKTEST PROFESIONAL =====")
+    print(f"Capital inicial: {CAPITAL_INICIAL}")
+    print(f"Capital final: {capital:.2f}")
+    print(f"PnL total: {pnl_total:.2f}")
+    print(f"Trades: {total_trades}")
+    print(f"Win rate: {win_rate:.2f}%")
+    print("==================================\n")
 
 
-# ===============================
-# EJECUCIÓN
-# ===============================
 if __name__ == "__main__":
-
-    for symbol in SYMBOLS:
-        run_backtest(symbol)
+    run_backtest()
