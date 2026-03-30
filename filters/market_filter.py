@@ -3,7 +3,7 @@ from ta.trend import EMAIndicator
 
 def mercado_favorable():
 
-    print("🌎 Analizando mercado global (BTC)...")
+    print("🌎 Analizando BTC...")
 
     df = obtener_datos("BTC/USDT")
 

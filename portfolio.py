@@ -4,13 +4,16 @@ capital = config.CAPITAL_INICIAL
 posiciones = {}
 
 STOP_LOSS = -0.02
-TAKE_PROFIT = 0.04
+TAKE_PROFIT = 0.05
 
 def abrir_posicion(symbol, precio, size):
 
     global capital
 
     if symbol in posiciones:
+        return False
+
+    if len(posiciones) >= config.MAX_POSICIONES:
         return False
 
     costo = precio * size
@@ -28,20 +31,6 @@ def abrir_posicion(symbol, precio, size):
     return True
 
 
-def revisar_posiciones(precio_actual):
-
-    cerrar = []
-
-    for symbol, pos in posiciones.items():
-
-        pnl = (precio_actual - pos["precio"]) / pos["precio"]
-
-        if pnl <= STOP_LOSS or pnl >= TAKE_PROFIT:
-            cerrar.append(symbol)
-
-    return cerrar
-
-
 def cerrar_posicion(symbol, precio):
 
     global capital
@@ -55,3 +44,15 @@ def cerrar_posicion(symbol, precio):
     del posiciones[symbol]
 
     return pnl
+
+
+def evaluar_salida(symbol, precio):
+
+    pos = posiciones[symbol]
+
+    pnl = (precio - pos["precio"]) / pos["precio"]
+
+    if pnl <= STOP_LOSS or pnl >= TAKE_PROFIT:
+        return True
+
+    return False

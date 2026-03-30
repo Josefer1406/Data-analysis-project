@@ -1,7 +1,7 @@
 # config.py
 
 CAPITAL_INICIAL = 1000
-RIESGO_POR_TRADE = 0.1
+RIESGO_POR_TRADE = 0.05
 
 TIMEFRAME = "5m"
 
@@ -9,9 +9,9 @@ CRYPTOS = [
     "BTC/USDT",
     "ETH/USDT",
     "SOL/USDT",
-    "XRP/USDT"
+    "XRP/USDT",
+    "ADA/USDT"
 ]
 
-MAX_POSICIONES = 3
-
+MAX_POSICIONES = 2
 CYCLE_TIME = 60

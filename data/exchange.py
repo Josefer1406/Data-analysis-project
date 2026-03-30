@@ -4,9 +4,7 @@ import config
 
 exchange = ccxt.bybit({
     "enableRateLimit": True,
-    "options": {
-        "defaultType": "spot"
-    }
+    "options": {"defaultType": "spot"}
 })
 
 def obtener_datos(symbol):

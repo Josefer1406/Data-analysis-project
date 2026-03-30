@@ -1,45 +1,56 @@
 import time
 import config
 
-from services.scanner import escanear
-from core.risk import calcular_size
 from filters.market_filter import mercado_favorable
+from services.scanner import analizar
+from core.risk import calcular_size
 
 import portfolio
 import logger
 
-print("🤖 BOT OPTIMIZADO INICIADO")
+print("🤖 BOT EXPERTO INICIADO")
 
 while True:
 
     try:
 
-        # 🚫 NO OPERAR SI MERCADO MALO
         if not mercado_favorable():
-            print("❌ Mercado no favorable")
+            print("⛔ No operar")
             time.sleep(60)
             continue
 
+        ranking = []
+
         for symbol in config.CRYPTOS:
 
-            signal, precio = escanear(symbol)
+            score, precio = analizar(symbol)
 
-            # 📊 REVISAR SALIDAS
-            cerrar = portfolio.revisar_posiciones(precio)
+            ranking.append((symbol, score, precio))
 
-            for s in cerrar:
+        # 🔥 ORDENAR MEJORES
+        ranking.sort(key=lambda x: x[1], reverse=True)
+
+        mejor = ranking[0]
+
+        symbol, score, precio = mejor
+
+        print(f"🏆 Mejor activo: {symbol} | Score {score}")
+
+        # 🔴 SALIDAS
+        for s in list(portfolio.posiciones.keys()):
+            if portfolio.evaluar_salida(s, precio):
                 pnl = portfolio.cerrar_posicion(s, precio)
                 logger.log_trade(s, "SELL", precio, 0, pnl)
                 print(f"🔴 Cierre {s} PnL {pnl}")
 
-            # 🟢 ENTRADA
-            if signal == "BUY":
+        # 🟢 ENTRADA
+        if score >= 2:
 
-                size = calcular_size(precio)
+            size = calcular_size(precio)
 
-                if portfolio.abrir_posicion(symbol, precio, size):
-                    logger.log_trade(symbol, "BUY", precio, size, 0)
-                    print(f"🟢 Compra {symbol}")
+            if portfolio.abrir_posicion(symbol, precio, size):
+                logger.log_trade(symbol, "BUY", precio, size, 0)
+                print(f"🟢 Compra {symbol}")
 
         print(f"💰 Capital: {portfolio.capital}")
         print("⏳ Esperando...\n")
