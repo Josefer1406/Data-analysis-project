@@ -1,10 +1,11 @@
 import config
 
-capital = config.CAPITAL_INICIAL
+capital = float(config.CAPITAL_INICIAL)
 posiciones = {}
 
 STOP_LOSS = -0.02
 TAKE_PROFIT = 0.05
+
 
 def abrir_posicion(symbol, precio, size):
     global capital
@@ -22,7 +23,11 @@ def abrir_posicion(symbol, precio, size):
 
     capital -= costo
 
-    posiciones[symbol] = {"precio": precio, "size": size}
+    posiciones[symbol] = {
+        "precio": precio,
+        "size": size
+    }
+
     return True
 
 
