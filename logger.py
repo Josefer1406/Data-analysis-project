@@ -1,7 +1,11 @@
 import csv
 import time
+import portfolio
 
 def log_trade(symbol, tipo, precio, size, pnl):
+
+    capital_actual = portfolio.capital
+
     with open("trades_log.csv", "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -10,5 +14,6 @@ def log_trade(symbol, tipo, precio, size, pnl):
             tipo,
             precio,
             size,
-            pnl
+            pnl,
+            capital_actual
         ])
