@@ -6,10 +6,16 @@ from services.scanner import analizar
 from core.risk import calcular_size
 
 import portfolio
-import logger
 import adaptive
 
+from logger import inicializar_log, log_trade
+
 print("🤖 BOT ELITE AUTO-OPTIMIZADO INICIADO")
+
+# =========================
+# INICIALIZAR LOG
+# =========================
+inicializar_log()
 
 while True:
 
@@ -41,7 +47,6 @@ while True:
             except Exception as e:
                 print(f"Error analizando {symbol}: {e}")
 
-        # evitar errores si no hay datos
         if not ranking:
             print("⚠️ No hay datos disponibles")
             time.sleep(config.CYCLE_TIME)
@@ -51,11 +56,9 @@ while True:
         # 4. ORDENAR MEJORES
         # =========================
         ranking.sort(key=lambda x: x[1], reverse=True)
-
         top_cryptos = ranking[:config.MAX_POSICIONES]
 
         print("\n🏆 Top oportunidades:")
-
         for symbol, score, precio in top_cryptos:
             print(f"{symbol} | Score {score} | Precio {precio}")
 
@@ -73,8 +76,21 @@ while True:
                     continue
 
                 if portfolio.evaluar_salida(symbol, precio_actual):
+
+                    size = portfolio.posiciones[symbol]["size"]
+
                     pnl = portfolio.cerrar_posicion(symbol, precio_actual)
-                    logger.log_trade(symbol, "SELL", precio_actual, 0, pnl)
+
+                    # 🔥 LOG CORRECTO (CON CAPITAL)
+                    log_trade(
+                        symbol,
+                        "SELL",
+                        precio_actual,
+                        size,
+                        pnl,
+                        portfolio.capital
+                    )
+
                     print(f"🔴 Cierre {symbol} | PnL: {pnl}")
 
             except Exception as e:
@@ -90,7 +106,17 @@ while True:
                     size = calcular_size(precio)
 
                     if portfolio.abrir_posicion(symbol, precio, size):
-                        logger.log_trade(symbol, "BUY", precio, size, 0)
+
+                        # 🔥 LOG CORRECTO (CON CAPITAL)
+                        log_trade(
+                            symbol,
+                            "BUY",
+                            precio,
+                            size,
+                            0,
+                            portfolio.capital
+                        )
+
                         print(f"🟢 Compra {symbol}")
 
             except Exception as e:
@@ -106,5 +132,5 @@ while True:
         time.sleep(config.CYCLE_TIME)
 
     except Exception as e:
-        print(f"ERROR GENERAL: {e}")
+        print(f"❌ ERROR GENERAL: {e}")
         time.sleep(10)

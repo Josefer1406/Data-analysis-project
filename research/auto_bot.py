@@ -1,5 +1,5 @@
 import time
-from optimizer import optimize
+from research.optimizer import optimize
 from config import SYMBOLS
 
 def log(msg):

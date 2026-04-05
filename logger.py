@@ -1,15 +1,26 @@
 import csv
+import os
 import time
-import portfolio
 
+ARCHIVO = "trades_log.csv"
 
-def log_trade(symbol, tipo, precio, size, pnl):
+def inicializar_log():
+    if not os.path.exists(ARCHIVO):
+        with open(ARCHIVO, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "fecha",
+                "symbol",
+                "tipo",
+                "precio",
+                "size",
+                "pnl",
+                "capital"
+            ])
 
-    capital_actual = float(portfolio.capital)
-
-    with open("trades_log.csv", "a", newline="") as f:
+def log_trade(symbol, tipo, precio, size, pnl, capital):
+    with open(ARCHIVO, "a", newline="") as f:
         writer = csv.writer(f)
-
         writer.writerow([
             time.strftime("%Y-%m-%d %H:%M:%S"),
             symbol,
@@ -17,5 +28,5 @@ def log_trade(symbol, tipo, precio, size, pnl):
             precio,
             size,
             pnl,
-            capital_actual
+            capital
         ])
