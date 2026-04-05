@@ -1,5 +1,6 @@
 import time
 import config
+portfolio.cargar_estado()
 
 from filters.market_filter import mercado_favorable
 from services.scanner import analizar
