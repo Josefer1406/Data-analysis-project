@@ -3,13 +3,12 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
-st.title("📊 Dashboard Bot Trading LIVE")
+st.title("📊 Dashboard Bot Trading LIVE (REAL TIME)")
 
-# 🔥 URL CORRECTA
-url = "https://raw.githubusercontent.com/Josefer1406/Data-analysis-project/main/trades_log.csv"
+url = "https://TU_URL/data"
 
 try:
-    df = pd.read_csv(url)
+    df = pd.read_json(url)
 
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
 
@@ -37,4 +36,4 @@ try:
     st.dataframe(df)
 
 except Exception as e:
-    st.error(f"Error cargando datos: {e}")
+    st.error(f"Error: {e}")

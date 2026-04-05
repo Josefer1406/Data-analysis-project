@@ -1,5 +1,4 @@
-ccxt
+flask
 pandas
-ta
-scikit-learn
-joblib
+streamlit
+requests
