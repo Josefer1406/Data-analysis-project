@@ -3,8 +3,9 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
-st.title("📊 Dashboard Bot Trading LIVE (REAL TIME)")
+st.title("📊 Dashboard Trading BOT (LIVE)")
 
+# 🔥 TU API (YA FUNCIONANDO)
 url = "https://TU_URL/data"
 
 try:
@@ -12,6 +13,9 @@ try:
 
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
 
+    # =========================
+    # MÉTRICAS
+    # =========================
     ventas = df[df["tipo"] == "SELL"]
 
     col1, col2, col3 = st.columns(3)
@@ -25,15 +29,29 @@ try:
     )
 
     col1.metric("PnL Total", f"{pnl_total:.2f} USDT")
-    col2.metric("Trades", total_trades)
+    col2.metric("Trades cerrados", total_trades)
     col3.metric("Win Rate", f"{win_rate:.2f}%")
 
+    # =========================
+    # CAPITAL
+    # =========================
     if not df.empty:
-        st.metric("Capital actual", f"{df['capital'].iloc[-1]:.2f} USDT")
+        capital_actual = df["capital"].iloc[-1]
+        st.metric("Capital actual", f"{capital_actual:.2f} USDT")
 
-    st.line_chart(df.set_index("fecha")["capital"])
+    # =========================
+    # CURVA
+    # =========================
+    st.subheader("📈 Curva de capital")
+    df_plot = df.dropna(subset=["fecha"]).set_index("fecha")
 
+    st.line_chart(df_plot["capital"])
+
+    # =========================
+    # HISTORIAL
+    # =========================
+    st.subheader("📋 Historial de trades")
     st.dataframe(df)
 
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"Error cargando datos: {e}")
