@@ -1,30 +1,23 @@
-import pandas as pd
 from ml.model import cargar_modelo
+import numpy as np
 
 model = cargar_modelo()
 
-def predecir(df):
+def predecir(features_dict):
 
-    try:
-        last = df.iloc[-1]
+    global model
 
-        X = pd.DataFrame([[
-            last["ema20"],
-            last["ema50"],
-            last["rsi"],
-            last["volume"],
-            last["return"],
-            last["volatility"],
-            last["momentum"]
-        ]], columns=[
-            "ema20","ema50","rsi","volume",
-            "return","volatility","momentum"
-        ])
+    if model is None:
+        return 0.5  # neutral
 
-        prob = model.predict_proba(X)[0][1]
+    X = np.array([[
+        features_dict["ema20"],
+        features_dict["ema50"],
+        features_dict["rsi"],
+        features_dict["volumen"],
+        features_dict["volatilidad"]
+    ]])
 
-        return prob
+    prob = model.predict_proba(X)[0][1]
 
-    except Exception as e:
-        print(f"Error ML: {e}")
-        return 0.5
+    return prob
