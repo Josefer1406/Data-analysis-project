@@ -1,6 +1,5 @@
 import time
 import config
-portfolio.cargar_estado()
 
 from filters.market_filter import mercado_favorable
 from services.scanner import analizar
@@ -14,10 +13,14 @@ from logger import inicializar_log, log_trade
 print("🤖 BOT ELITE AUTO-OPTIMIZADO INICIADO")
 
 # =========================
-# INICIALIZAR LOG
+# INICIALIZACIÓN
 # =========================
-inicializar_log()
+portfolio.cargar_estado()   # 🔥 cargar estado persistente
+inicializar_log()           # 🔥 crear CSV si no existe
 
+# =========================
+# LOOP PRINCIPAL
+# =========================
 while True:
 
     try:
@@ -82,7 +85,7 @@ while True:
 
                     pnl = portfolio.cerrar_posicion(symbol, precio_actual)
 
-                    # 🔥 LOG CORRECTO (CON CAPITAL)
+                    # 🔥 LOG SELL COMPLETO
                     log_trade(
                         symbol,
                         "SELL",
@@ -108,7 +111,7 @@ while True:
 
                     if portfolio.abrir_posicion(symbol, precio, size):
 
-                        # 🔥 LOG CORRECTO (CON CAPITAL)
+                        # 🔥 LOG BUY COMPLETO
                         log_trade(
                             symbol,
                             "BUY",
