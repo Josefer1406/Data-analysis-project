@@ -1,6 +1,7 @@
 import csv
 import os
 import time
+import subprocess
 
 ARCHIVO = "trades_log.csv"
 
@@ -19,6 +20,7 @@ def inicializar_log():
             ])
 
 def log_trade(symbol, tipo, precio, size, pnl, capital):
+
     with open(ARCHIVO, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -30,3 +32,13 @@ def log_trade(symbol, tipo, precio, size, pnl, capital):
             pnl,
             capital
         ])
+
+    # =========================
+    # SUBIR A GITHUB
+    # =========================
+    try:
+        subprocess.run(["git", "add", ARCHIVO])
+        subprocess.run(["git", "commit", "-m", "update trades"])
+        subprocess.run(["git", "push"])
+    except Exception as e:
+        print("Error subiendo a GitHub:", e)

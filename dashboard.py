@@ -3,25 +3,19 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
-st.title("📊 Dashboard Bot Trading PRO")
+st.title("📊 Bot Trading Dashboard LIVE")
 
-archivo = "trades_log.csv"
+# URL RAW de GitHub (IMPORTANTE)
+url = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/trades_log.csv"
 
 try:
-    df = pd.read_csv(archivo)
+    df = pd.read_csv(url)
 
-    # =========================
-    # LIMPIEZA
-    # =========================
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
 
-    # solo ventas para métricas reales
     ventas = df[df["tipo"] == "SELL"].copy()
 
-    # =========================
-    # MÉTRICAS
-    # =========================
-    st.subheader("📈 Métricas generales")
+    st.subheader("📈 Métricas")
 
     col1, col2, col3 = st.columns(3)
 
@@ -34,41 +28,19 @@ try:
     )
 
     col1.metric("PnL Total", f"{pnl_total:.2f} USDT")
-    col2.metric("Trades cerrados", total_trades)
+    col2.metric("Trades", total_trades)
     col3.metric("Win Rate", f"{win_rate:.2f}%")
 
-    # =========================
-    # CAPITAL
-    # =========================
     st.subheader("💰 Capital")
 
     if not df.empty:
-        capital_inicial = df["capital"].iloc[0]
-        capital_actual = df["capital"].iloc[-1]
+        st.metric("Capital actual", f"{df['capital'].iloc[-1]:.2f} USDT")
 
-        col4, col5 = st.columns(2)
-
-        col4.metric("Capital inicial", f"{capital_inicial:.2f} USDT")
-        col5.metric("Capital actual", f"{capital_actual:.2f} USDT")
-
-    # =========================
-    # CURVA DE CAPITAL
-    # =========================
     st.subheader("📊 Curva de capital")
+    st.line_chart(df.set_index("fecha")["capital"])
 
-    if "capital" in df.columns:
-        df_capital = df.copy()
-        df_capital = df_capital.dropna(subset=["fecha"])
-        df_capital = df_capital.set_index("fecha")
-
-        st.line_chart(df_capital["capital"])
-
-    # =========================
-    # HISTORIAL
-    # =========================
-    st.subheader("📋 Historial de trades")
-
+    st.subheader("📋 Historial")
     st.dataframe(df)
 
 except Exception as e:
-    st.error(f"❌ Error cargando archivo: {e}")
+    st.error(f"Error: {e}")
