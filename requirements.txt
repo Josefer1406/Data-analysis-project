@@ -1,4 +1,5 @@
 flask
 pandas
+psycopg2-binary
 requests
 streamlit

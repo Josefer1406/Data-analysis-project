@@ -3,6 +3,7 @@ import threading
 import time
 import pandas as pd
 import os
+import datetime
 
 import config
 import portfolio
@@ -11,30 +12,42 @@ import adaptive
 from filters.market_filter import mercado_favorable
 from services.scanner import analizar
 from core.risk import calcular_size
-from logger import inicializar_log, log_trade
+
+from database import crear_tablas, insertar_trade, obtener_trades
 
 # =========================
 # FLASK
 # =========================
 app = Flask(__name__)
 
-ARCHIVO = "trades_log.csv"
-
 # =========================
 # API
 # =========================
 @app.route("/")
 def home():
-    return "BOT + API ACTIVO ✅"
+    return "BOT + API + DB ACTIVO ✅"
 
 @app.route("/data")
 def data():
-    if not os.path.exists(ARCHIVO):
-        return jsonify([])
-
     try:
-        df = pd.read_csv(ARCHIVO)
-        return df.to_json(orient="records")
+        rows = obtener_trades()
+
+        # convertir a formato JSON
+        data = []
+        for r in rows:
+            data.append({
+                "id": r[0],
+                "fecha": r[1],
+                "symbol": r[2],
+                "tipo": r[3],
+                "precio": r[4],
+                "size": r[5],
+                "pnl": r[6],
+                "capital": r[7]
+            })
+
+        return jsonify(data)
+
     except Exception as e:
         return jsonify({"error": str(e)})
 
@@ -43,10 +56,10 @@ def data():
 # =========================
 def run_bot():
 
-    print("🤖 BOT + API INICIADO")
+    print("🤖 BOT PROFESIONAL INICIADO")
 
     portfolio.cargar_estado()
-    inicializar_log()
+    crear_tablas()  # 🔥 crea DB si no existe
 
     while True:
         try:
@@ -76,7 +89,7 @@ def run_bot():
             top_cryptos = ranking[:config.MAX_POSICIONES]
 
             # =========================
-            # CIERRES
+            # CIERRE DE POSICIONES
             # =========================
             for symbol in list(portfolio.posiciones.keys()):
                 try:
@@ -93,7 +106,9 @@ def run_bot():
                         size = portfolio.posiciones[symbol]["size"]
                         pnl = portfolio.cerrar_posicion(symbol, precio_actual)
 
-                        log_trade(
+                        # 🔥 GUARDAR EN DB
+                        insertar_trade(
+                            datetime.datetime.now(),
                             symbol,
                             "SELL",
                             precio_actual,
@@ -108,7 +123,7 @@ def run_bot():
                     print(f"Error cierre {symbol}: {e}")
 
             # =========================
-            # APERTURAS
+            # APERTURA DE POSICIONES
             # =========================
             for symbol, score, precio in top_cryptos:
                 try:
@@ -118,7 +133,9 @@ def run_bot():
 
                         if portfolio.abrir_posicion(symbol, precio, size):
 
-                            log_trade(
+                            # 🔥 GUARDAR EN DB
+                            insertar_trade(
+                                datetime.datetime.now(),
                                 symbol,
                                 "BUY",
                                 precio,
@@ -133,6 +150,8 @@ def run_bot():
                     print(f"Error compra {symbol}: {e}")
 
             print(f"💰 Capital: {portfolio.capital}")
+            print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
@@ -144,11 +163,11 @@ def run_bot():
 # =========================
 if __name__ == "__main__":
 
-    # 🔥 ejecutar bot en segundo plano
+    # BOT en segundo plano
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
 
-    # 🔥 ejecutar API
+    # API
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
