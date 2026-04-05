@@ -6,7 +6,7 @@ st.set_page_config(layout="wide")
 st.title("📊 Bot Trading Dashboard LIVE")
 
 # URL RAW de GitHub (IMPORTANTE)
-url = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/trades_log.csv"
+url = "https://raw.githubusercontent.com/Josefer1406/Data-analysis-project/refs/heads/main/trades_log.csvlog.csv"
 
 try:
     df = pd.read_csv(url)
