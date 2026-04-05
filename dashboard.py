@@ -3,19 +3,17 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
-st.title("📊 Bot Trading Dashboard LIVE")
+st.title("📊 Dashboard Bot Trading LIVE")
 
-# URL RAW de GitHub (IMPORTANTE)
-url = "https://raw.githubusercontent.com/Josefer1406/Data-analysis-project/refs/heads/main/trades_log.csvlog.csv"
+# 🔥 URL CORRECTA
+url = "https://raw.githubusercontent.com/Josefer1406/Data-analysis-project/main/trades_log.csv"
 
 try:
     df = pd.read_csv(url)
 
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
 
-    ventas = df[df["tipo"] == "SELL"].copy()
-
-    st.subheader("📈 Métricas")
+    ventas = df[df["tipo"] == "SELL"]
 
     col1, col2, col3 = st.columns(3)
 
@@ -31,16 +29,12 @@ try:
     col2.metric("Trades", total_trades)
     col3.metric("Win Rate", f"{win_rate:.2f}%")
 
-    st.subheader("💰 Capital")
-
     if not df.empty:
         st.metric("Capital actual", f"{df['capital'].iloc[-1]:.2f} USDT")
 
-    st.subheader("📊 Curva de capital")
     st.line_chart(df.set_index("fecha")["capital"])
 
-    st.subheader("📋 Historial")
     st.dataframe(df)
 
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"Error cargando datos: {e}")
