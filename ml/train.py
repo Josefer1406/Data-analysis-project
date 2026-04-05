@@ -1,36 +1,58 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from ml.model import guardar_modelo
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-def entrenar_modelo(df):
+from ml.model import guardar_modelo
+from ml.dataset import cargar_datos, crear_features
+
+def entrenar():
+
+    df = cargar_datos()
+
+    if len(df) < 50:
+        print("❌ No hay suficientes datos para entrenar")
+        return
+
+    df = crear_features(df)
 
     # =========================
     # FEATURES
     # =========================
     X = df[[
-        "ema20",
-        "ema50",
-        "rsi",
-        "volumen",
-        "volatilidad"
+        "retorno",
+        "volatilidad",
+        "momentum"
     ]]
 
-    # =========================
-    # TARGET
-    # =========================
-    y = df["target"]  # 1 sube, 0 baja
+    y = df["target"]
 
     # =========================
-    # MODELO BASE
+    # SPLIT
+    # =========================
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, shuffle=False
+    )
+
+    # =========================
+    # MODELO
     # =========================
     model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=5,
+        n_estimators=200,
+        max_depth=6,
         random_state=42
     )
 
-    model.fit(X, y)
+    model.fit(X_train, y_train)
+
+    # =========================
+    # EVALUACIÓN
+    # =========================
+    preds = model.predict(X_test)
+    acc = accuracy_score(y_test, preds)
+
+    print(f"📊 Accuracy: {acc:.2f}")
 
     guardar_modelo(model)
 
-    print("✅ Modelo entrenado")
+    print("✅ Modelo actualizado con datos reales")
