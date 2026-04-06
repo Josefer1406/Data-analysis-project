@@ -1,35 +1,13 @@
-from ta.trend import EMAIndicator
-from ta.momentum import RSIIndicator
-import config
+import numpy as np
 
-def aplicar_estrategia(df):
+def trend_following(last):
+    return 1 if last["ema20"] > last["ema50"] else 0
 
-    df["ema_fast"] = EMAIndicator(
-        df["close"],
-        window=config.EMA_FAST
-    ).ema_indicator()
+def mean_reversion(last):
+    return 1 if last["rsi"] < 30 else 0
 
-    df["ema_slow"] = EMAIndicator(
-        df["close"],
-        window=config.EMA_SLOW
-    ).ema_indicator()
+def momentum(last):
+    return 1 if last["rsi"] > 55 else 0
 
-    df["rsi"] = RSIIndicator(
-        df["close"],
-        window=14
-    ).rsi()
-
-    return df
-
-
-def evaluar(df):
-
-    row = df.iloc[-1]
-
-    if row["ema_fast"] > row["ema_slow"] and row["rsi"] < config.RSI_BUY:
-        return "BUY"
-
-    if row["rsi"] > config.RSI_SELL:
-        return "SELL"
-
-    return "HOLD"
+def volatility_filter(last):
+    return 1 if last["volatilidad"] < 0.05 else 0

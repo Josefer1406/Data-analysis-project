@@ -1,75 +1,57 @@
 from data.exchange import obtener_datos
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
+import numpy as np
 
 from ml.predictor import predecir
+from core.strategies import (
+    trend_following,
+    mean_reversion,
+    momentum,
+    volatility_filter
+)
+from core.ensemble import decision_ensemble
 
 def analizar(symbol):
 
     df = obtener_datos(symbol)
 
-    # =========================
-    # INDICADORES BASE
-    # =========================
     df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
     df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
     df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
 
-    # =========================
-    # FEATURES AVANZADAS (ML)
-    # =========================
-    df["return"] = df["close"].pct_change()
-    df["volatility"] = df["return"].rolling(10).std()
-    df["momentum"] = df["close"] - df["close"].shift(5)
+    df["volumen"] = df["volume"]
+    df["volatilidad"] = df["close"].pct_change().rolling(10).std()
 
     df = df.dropna()
-
-    if df.empty:
-        return 0, 0
 
     last = df.iloc[-1]
 
     # =========================
-    # PREDICCIÓN ML
+    # ML
     # =========================
-    prob = predecir(df)
+    features = {
+        "ema20": last["ema20"],
+        "ema50": last["ema50"],
+        "rsi": last["rsi"],
+        "volumen": last["volumen"],
+        "volatilidad": last["volatilidad"]
+    }
 
-    score = 0
-
-    # =========================
-    # 1. TENDENCIA
-    # =========================
-    if last["ema20"] > last["ema50"]:
-        score += 1
-
-    # =========================
-    # 2. MOMENTUM (RSI)
-    # =========================
-    if 30 < last["rsi"] < 60:
-        score += 1
+    ml_prob = predecir(features)
 
     # =========================
-    # 3. FUERZA DE TENDENCIA
+    # ESTRATEGIAS
     # =========================
-    fuerza = abs(last["ema20"] - last["ema50"]) / last["close"]
+    signals = [
+        trend_following(last),
+        mean_reversion(last),
+        momentum(last),
+        volatility_filter(last)
+    ]
 
-    if fuerza > 0.01:
-        score += 1
+    decision = decision_ensemble(signals, ml_prob)
 
-    # =========================
-    # 4. VOLUMEN
-    # =========================
-    vol_prom = df["volume"].rolling(20).mean().iloc[-1]
+    score = sum(signals)
 
-    if last["volume"] > vol_prom:
-        score += 1
-
-    # =========================
-    # 5. MACHINE LEARNING (PESO ALTO)
-    # =========================
-    if prob > 0.65:
-        score += 2
-    elif prob > 0.55:
-        score += 1
-
-    return score, last["close"]
+    return score, last["close"], decision
