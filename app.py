@@ -1,27 +1,28 @@
 from flask import Flask, jsonify
-import threading
-import time
-import datetime
-import os
+import threading, time, datetime, os
+import pandas as pd
 
-import config
-import portfolio
+import config, portfolio
 
 from services.scanner import analizar
 from filters.market_filter import mercado_favorable
 from core.portfolio_manager import asignar_capital
+from core.volatility import ajustar_por_volatilidad
+from core.risk_engine import RiskEngine
+from core.correlation_filter import filtrar_correlacion
+
 from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
+risk = RiskEngine()
 
 @app.route("/")
 def home():
-    return "🚀 BOT CUANT PORTFOLIO PRO"
+    return "🚀 SISTEMA CUANT INSTITUCIONAL"
 
 @app.route("/data")
 def data():
     rows = obtener_trades()
-
     return jsonify([
         {
             "fecha": r[1],
@@ -36,107 +37,87 @@ def data():
 
 def run_bot():
 
-    print("🤖 BOT PORTFOLIO PRO INICIADO")
-
     portfolio.cargar_estado()
     crear_tablas()
+
+    peak = portfolio.capital
 
     while True:
         try:
 
-            # =========================
-            # FILTRO DE MERCADO
-            # =========================
             if not mercado_favorable():
                 print("🚫 Mercado no favorable")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
             candidatos = []
+            prices_dict = {}
 
             for symbol in config.CRYPTOS:
-                try:
-                    score, precio, decision, prob = analizar(symbol)
+                score, precio, decision, prob, vol = analizar(symbol)
 
-                    if decision == "BUY":
-                        candidatos.append((symbol, score, prob, precio))
+                prices_dict[symbol] = precio
 
-                except Exception as e:
-                    print(f"Error {symbol}: {e}")
+                if decision == "BUY":
+                    candidatos.append((symbol, score, prob, precio, vol))
 
             if not candidatos:
-                print("⚠️ No hay oportunidades")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
             # =========================
-            # ALLOCATION INTELIGENTE
+            # CORRELACIÓN
             # =========================
-            allocation = asignar_capital(
-                candidatos,
+            df_prices = pd.DataFrame({k: [v] for k, v in prices_dict.items()})
+            seleccion = filtrar_correlacion(df_prices)
+
+            candidatos = [c for c in candidatos if c[0] in seleccion]
+
+            # =========================
+            # ALLOCATION
+            # =========================
+            alloc = asignar_capital(
+                [(c[0], c[1], c[2], c[3]) for c in candidatos],
                 portfolio.capital,
                 config.MAX_POSICIONES
             )
 
             # =========================
-            # CIERRES
+            # RISK CONTROL
             # =========================
-            for symbol in list(portfolio.posiciones.keys()):
-                try:
-                    precio_actual = next(
-                        (c[3] for c in candidatos if c[0] == symbol),
-                        None
+            if not risk.controlar_drawdown(portfolio.capital, peak):
+                print("🛑 STOP TRADING")
+                time.sleep(60)
+                continue
+
+            peak = max(peak, portfolio.capital)
+
+            # =========================
+            # EJECUCIÓN
+            # =========================
+            for symbol, data_alloc in alloc.items():
+
+                precio = data_alloc["precio"]
+                capital = data_alloc["capital"]
+
+                vol = next(c[4] for c in candidatos if c[0] == symbol)
+
+                size = ajustar_por_volatilidad(precio, vol, capital)
+
+                if portfolio.abrir_posicion(symbol, precio, size):
+
+                    insertar_trade(
+                        datetime.datetime.now(),
+                        symbol,
+                        "BUY",
+                        precio,
+                        size,
+                        0,
+                        portfolio.capital
                     )
 
-                    if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
+                    print(f"🟢 BUY {symbol}")
 
-                        size = portfolio.posiciones[symbol]["size"]
-                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
-
-                        insertar_trade(
-                            datetime.datetime.now(),
-                            symbol,
-                            "SELL",
-                            precio_actual,
-                            size,
-                            pnl,
-                            portfolio.capital
-                        )
-
-                        print(f"🔴 SELL {symbol}")
-
-                except Exception as e:
-                    print(f"Error cierre {symbol}: {e}")
-
-            # =========================
-            # APERTURAS PRO
-            # =========================
-            for symbol, data_alloc in allocation.items():
-
-                capital_asignado = data_alloc["capital"]
-                precio = data_alloc["precio"]
-
-                size = capital_asignado / precio
-
-                try:
-                    if portfolio.abrir_posicion(symbol, precio, size):
-
-                        insertar_trade(
-                            datetime.datetime.now(),
-                            symbol,
-                            "BUY",
-                            precio,
-                            size,
-                            0,
-                            portfolio.capital
-                        )
-
-                        print(f"🟢 BUY {symbol} (capital: {round(capital_asignado,2)})")
-
-                except Exception as e:
-                    print(f"Error compra {symbol}: {e}")
-
-            print(f"💰 Capital total: {portfolio.capital}")
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:

@@ -11,7 +11,6 @@ def analizar(symbol):
     df["ema50"] = EMAIndicator(df["close"], 50).ema_indicator()
     df["rsi"] = RSIIndicator(df["close"], 14).rsi()
 
-    df["volumen"] = df["volume"]
     df["volatilidad"] = df["close"].pct_change().rolling(10).std()
 
     df = df.dropna()
@@ -21,7 +20,7 @@ def analizar(symbol):
         "ema20": last["ema20"],
         "ema50": last["ema50"],
         "rsi": last["rsi"],
-        "volumen": last["volumen"],
+        "volumen": df["volume"].iloc[-1],
         "volatilidad": last["volatilidad"]
     }
 
@@ -35,9 +34,9 @@ def analizar(symbol):
     if 40 < last["rsi"] < 60:
         score += 1
 
-    if prob > 0.6:
+    if prob > 0.65:
         score += 2
 
     decision = "BUY" if score >= 3 else "HOLD"
 
-    return score, last["close"], decision, prob
+    return score, last["close"], decision, prob, last["volatilidad"]
