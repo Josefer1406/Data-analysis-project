@@ -29,19 +29,15 @@ def analizar(symbol):
 
     score = 0
 
-    # tendencia fuerte
     if last["ema20"] > last["ema50"]:
         score += 1
 
-    # entrada en pullback sano
     if 40 < last["rsi"] < 60:
         score += 1
 
-    # ML fuerte
-    if prob > 0.65:
+    if prob > 0.6:
         score += 2
 
-    # FILTRO DURO
     decision = "BUY" if score >= 3 else "HOLD"
 
-    return score, last["close"], decision
+    return score, last["close"], decision, prob

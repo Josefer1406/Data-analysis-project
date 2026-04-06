@@ -6,19 +6,17 @@ import os
 
 import config
 import portfolio
-import adaptive
 
 from services.scanner import analizar
-from core.risk import calcular_size
 from filters.market_filter import mercado_favorable
-
+from core.portfolio_manager import asignar_capital
 from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "🚀 BOT CUANT OPTIMIZADO"
+    return "🚀 BOT CUANT PORTFOLIO PRO"
 
 @app.route("/data")
 def data():
@@ -38,7 +36,7 @@ def data():
 
 def run_bot():
 
-    print("🤖 BOT OPTIMIZADO INICIADO")
+    print("🤖 BOT PORTFOLIO PRO INICIADO")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -50,58 +48,77 @@ def run_bot():
             # FILTRO DE MERCADO
             # =========================
             if not mercado_favorable():
-                print("🚫 Mercado no favorable, no operar")
+                print("🚫 Mercado no favorable")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            ranking = []
+            candidatos = []
 
             for symbol in config.CRYPTOS:
                 try:
-                    score, precio, decision = analizar(symbol)
-                    ranking.append((symbol, score, precio, decision))
+                    score, precio, decision, prob = analizar(symbol)
+
+                    if decision == "BUY":
+                        candidatos.append((symbol, score, prob, precio))
+
                 except Exception as e:
                     print(f"Error {symbol}: {e}")
 
-            ranking.sort(key=lambda x: x[1], reverse=True)
+            if not candidatos:
+                print("⚠️ No hay oportunidades")
+                time.sleep(config.CYCLE_TIME)
+                continue
 
             # =========================
-            # SOLO TOP 2 (MENOS TRADES)
+            # ALLOCATION INTELIGENTE
             # =========================
-            top = ranking[:2]
+            allocation = asignar_capital(
+                candidatos,
+                portfolio.capital,
+                config.MAX_POSICIONES
+            )
 
             # =========================
             # CIERRES
             # =========================
             for symbol in list(portfolio.posiciones.keys()):
-                precio_actual = next((p for s, sc, p, d in ranking if s == symbol), None)
-
-                if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
-
-                    size = portfolio.posiciones[symbol]["size"]
-                    pnl = portfolio.cerrar_posicion(symbol, precio_actual)
-
-                    insertar_trade(
-                        datetime.datetime.now(),
-                        symbol,
-                        "SELL",
-                        precio_actual,
-                        size,
-                        pnl,
-                        portfolio.capital
+                try:
+                    precio_actual = next(
+                        (c[3] for c in candidatos if c[0] == symbol),
+                        None
                     )
 
-                    print(f"🔴 SELL {symbol}")
+                    if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
+
+                        size = portfolio.posiciones[symbol]["size"]
+                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
+
+                        insertar_trade(
+                            datetime.datetime.now(),
+                            symbol,
+                            "SELL",
+                            precio_actual,
+                            size,
+                            pnl,
+                            portfolio.capital
+                        )
+
+                        print(f"🔴 SELL {symbol}")
+
+                except Exception as e:
+                    print(f"Error cierre {symbol}: {e}")
 
             # =========================
-            # APERTURAS (MUY SELECTIVO)
+            # APERTURAS PRO
             # =========================
-            for symbol, score, precio, decision in top:
+            for symbol, data_alloc in allocation.items():
 
-                if decision == "BUY":
+                capital_asignado = data_alloc["capital"]
+                precio = data_alloc["precio"]
 
-                    size = calcular_size(precio)
+                size = capital_asignado / precio
 
+                try:
                     if portfolio.abrir_posicion(symbol, precio, size):
 
                         insertar_trade(
@@ -114,9 +131,12 @@ def run_bot():
                             portfolio.capital
                         )
 
-                        print(f"🟢 BUY {symbol}")
+                        print(f"🟢 BUY {symbol} (capital: {round(capital_asignado,2)})")
 
-            print(f"💰 Capital: {portfolio.capital}")
+                except Exception as e:
+                    print(f"Error compra {symbol}: {e}")
+
+            print(f"💰 Capital total: {portfolio.capital}")
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
