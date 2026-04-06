@@ -6,21 +6,16 @@ import os
 
 import config
 import portfolio
-import adaptive
 
 from services.scanner import analizar
 from core.risk import calcular_size
-
 from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
 
-# =========================
-# API
-# =========================
 @app.route("/")
 def home():
-    return "🚀 BOT CUANT - MODO ENTRENAMIENTO"
+    return "🚀 BOT CUANT - ENTRENAMIENTO ACTIVO"
 
 @app.route("/data")
 def data():
@@ -38,12 +33,9 @@ def data():
         } for r in rows
     ])
 
-# =========================
-# BOT
-# =========================
 def run_bot():
 
-    print("🤖 BOT EN MODO ENTRENAMIENTO (SIN FILTRO)")
+    print("🤖 BOT ENTRENANDO (ESTABLE)")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -53,9 +45,6 @@ def run_bot():
 
             ranking = []
 
-            # =========================
-            # SCANNER
-            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
@@ -68,89 +57,69 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # ORDENAR POR PROBABILIDAD (ML)
-            # =========================
+            # ordenar por ML
             ranking.sort(key=lambda x: x[4], reverse=True)
 
-            # =========================
-            # TOMAR TOP
-            # =========================
             top = ranking[:config.MAX_POSICIONES]
 
             # =========================
-            # CIERRE DE POSICIONES
+            # CIERRES
             # =========================
             for symbol in list(portfolio.posiciones.keys()):
-                try:
-                    precio_actual = next(
-                        (p for s, sc, p, d, pr in ranking if s == symbol),
-                        None
+                precio_actual = next(
+                    (p for s, sc, p, d, pr in ranking if s == symbol),
+                    None
+                )
+
+                if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
+
+                    size = portfolio.posiciones[symbol]["size"]
+                    pnl = portfolio.cerrar_posicion(symbol, precio_actual)
+
+                    insertar_trade(
+                        datetime.datetime.now(),
+                        symbol,
+                        "SELL",
+                        precio_actual,
+                        size,
+                        pnl,
+                        portfolio.capital
                     )
 
-                    if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
+                    print(f"🔴 SELL {symbol}")
 
-                        size = portfolio.posiciones[symbol]["size"]
-                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
+            # =========================
+            # APERTURAS
+            # =========================
+            for symbol, score, precio, decision, prob in top:
+
+                if prob > 0.55:
+
+                    size = calcular_size(precio)
+
+                    if portfolio.abrir_posicion(symbol, precio, size):
 
                         insertar_trade(
                             datetime.datetime.now(),
                             symbol,
-                            "SELL",
-                            precio_actual,
+                            "BUY",
+                            precio,
                             size,
-                            pnl,
+                            0,
                             portfolio.capital
                         )
 
-                        print(f"🔴 SELL {symbol} | PnL: {pnl}")
-
-                except Exception as e:
-                    print(f"Error cierre {symbol}: {e}")
-
-            # =========================
-            # APERTURA (MENOS ESTRICTO)
-            # =========================
-            for symbol, score, precio, decision, prob in top:
-                try:
-                    # 🔥 MODO ENTRENAMIENTO: menos filtro
-                    if prob > 0.55:
-
-                        size = calcular_size(precio)
-
-                        if portfolio.abrir_posicion(symbol, precio, size):
-
-                            insertar_trade(
-                                datetime.datetime.now(),
-                                symbol,
-                                "BUY",
-                                precio,
-                                size,
-                                0,
-                                portfolio.capital
-                            )
-
-                            print(f"🟢 BUY {symbol} | prob: {round(prob,2)}")
-
-                except Exception as e:
-                    print(f"Error compra {symbol}: {e}")
+                        print(f"🟢 BUY {symbol} | prob: {round(prob,2)}")
 
             print(f"💰 Capital: {portfolio.capital}")
-            print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print("⏳ Generando datos...\n")
+            print("⏳ Entrenando...\n")
 
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR GENERAL: {e}")
+            print(f"❌ ERROR: {e}")
             time.sleep(10)
 
-# =========================
-# MAIN
-# =========================
 if __name__ == "__main__":
-
     threading.Thread(target=run_bot, daemon=True).start()
-
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

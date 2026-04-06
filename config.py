@@ -36,7 +36,6 @@ CRYPTOS = [
     "DOGE/USDT",
     "AVAX/USDT",
     "LINK/USDT",
-    "MATIC/USDT",
     "LTC/USDT",
     "ATOM/USDT"
 ]

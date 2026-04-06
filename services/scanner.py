@@ -11,16 +11,21 @@ def analizar(symbol):
     df["ema50"] = EMAIndicator(df["close"], 50).ema_indicator()
     df["rsi"] = RSIIndicator(df["close"], 14).rsi()
 
+    df["volumen"] = df["volume"]
     df["volatilidad"] = df["close"].pct_change().rolling(10).std()
 
     df = df.dropna()
+
+    if df.empty:
+        raise Exception("No data")
+
     last = df.iloc[-1]
 
     features = {
         "ema20": last["ema20"],
         "ema50": last["ema50"],
         "rsi": last["rsi"],
-        "volumen": df["volume"].iloc[-1],
+        "volumen": last["volumen"],
         "volatilidad": last["volatilidad"]
     }
 
@@ -34,9 +39,10 @@ def analizar(symbol):
     if 40 < last["rsi"] < 60:
         score += 1
 
-    if prob > 0.65:
+    if prob > 0.6:
         score += 2
 
     decision = "BUY" if score >= 3 else "HOLD"
 
-    return score, last["close"], decision, prob, last["volatilidad"]
+    # 🔥 SOLO 4 VALORES (CLAVE)
+    return score, last["close"], decision, prob
