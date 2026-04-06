@@ -1,28 +1,31 @@
 from flask import Flask, jsonify
-import threading, time, datetime, os
-import pandas as pd
+import threading
+import time
+import datetime
+import os
 
-import config, portfolio
+import config
+import portfolio
+import adaptive
 
 from services.scanner import analizar
-from filters.market_filter import mercado_favorable
-from core.portfolio_manager import asignar_capital
-from core.volatility import ajustar_por_volatilidad
-from core.risk_engine import RiskEngine
-from core.correlation_filter import filtrar_correlacion
+from core.risk import calcular_size
 
 from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
-risk = RiskEngine()
 
+# =========================
+# API
+# =========================
 @app.route("/")
 def home():
-    return "🚀 SISTEMA CUANT INSTITUCIONAL"
+    return "🚀 BOT CUANT - MODO ENTRENAMIENTO"
 
 @app.route("/data")
 def data():
     rows = obtener_trades()
+
     return jsonify([
         {
             "fecha": r[1],
@@ -35,95 +38,119 @@ def data():
         } for r in rows
     ])
 
+# =========================
+# BOT
+# =========================
 def run_bot():
+
+    print("🤖 BOT EN MODO ENTRENAMIENTO (SIN FILTRO)")
 
     portfolio.cargar_estado()
     crear_tablas()
 
-    peak = portfolio.capital
-
     while True:
         try:
 
-            if not mercado_favorable():
-                print("🚫 Mercado no favorable")
-                time.sleep(config.CYCLE_TIME)
-                continue
+            ranking = []
 
-            candidatos = []
-            prices_dict = {}
-
+            # =========================
+            # SCANNER
+            # =========================
             for symbol in config.CRYPTOS:
-                score, precio, decision, prob, vol = analizar(symbol)
+                try:
+                    score, precio, decision, prob = analizar(symbol)
+                    ranking.append((symbol, score, precio, decision, prob))
+                except Exception as e:
+                    print(f"Error analizando {symbol}: {e}")
 
-                prices_dict[symbol] = precio
-
-                if decision == "BUY":
-                    candidatos.append((symbol, score, prob, precio, vol))
-
-            if not candidatos:
+            if not ranking:
+                print("⚠️ No hay datos")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
             # =========================
-            # CORRELACIÓN
+            # ORDENAR POR PROBABILIDAD (ML)
             # =========================
-            df_prices = pd.DataFrame({k: [v] for k, v in prices_dict.items()})
-            seleccion = filtrar_correlacion(df_prices)
-
-            candidatos = [c for c in candidatos if c[0] in seleccion]
+            ranking.sort(key=lambda x: x[4], reverse=True)
 
             # =========================
-            # ALLOCATION
+            # TOMAR TOP
             # =========================
-            alloc = asignar_capital(
-                [(c[0], c[1], c[2], c[3]) for c in candidatos],
-                portfolio.capital,
-                config.MAX_POSICIONES
-            )
+            top = ranking[:config.MAX_POSICIONES]
 
             # =========================
-            # RISK CONTROL
+            # CIERRE DE POSICIONES
             # =========================
-            if not risk.controlar_drawdown(portfolio.capital, peak):
-                print("🛑 STOP TRADING")
-                time.sleep(60)
-                continue
-
-            peak = max(peak, portfolio.capital)
-
-            # =========================
-            # EJECUCIÓN
-            # =========================
-            for symbol, data_alloc in alloc.items():
-
-                precio = data_alloc["precio"]
-                capital = data_alloc["capital"]
-
-                vol = next(c[4] for c in candidatos if c[0] == symbol)
-
-                size = ajustar_por_volatilidad(precio, vol, capital)
-
-                if portfolio.abrir_posicion(symbol, precio, size):
-
-                    insertar_trade(
-                        datetime.datetime.now(),
-                        symbol,
-                        "BUY",
-                        precio,
-                        size,
-                        0,
-                        portfolio.capital
+            for symbol in list(portfolio.posiciones.keys()):
+                try:
+                    precio_actual = next(
+                        (p for s, sc, p, d, pr in ranking if s == symbol),
+                        None
                     )
 
-                    print(f"🟢 BUY {symbol}")
+                    if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
+
+                        size = portfolio.posiciones[symbol]["size"]
+                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
+
+                        insertar_trade(
+                            datetime.datetime.now(),
+                            symbol,
+                            "SELL",
+                            precio_actual,
+                            size,
+                            pnl,
+                            portfolio.capital
+                        )
+
+                        print(f"🔴 SELL {symbol} | PnL: {pnl}")
+
+                except Exception as e:
+                    print(f"Error cierre {symbol}: {e}")
+
+            # =========================
+            # APERTURA (MENOS ESTRICTO)
+            # =========================
+            for symbol, score, precio, decision, prob in top:
+                try:
+                    # 🔥 MODO ENTRENAMIENTO: menos filtro
+                    if prob > 0.55:
+
+                        size = calcular_size(precio)
+
+                        if portfolio.abrir_posicion(symbol, precio, size):
+
+                            insertar_trade(
+                                datetime.datetime.now(),
+                                symbol,
+                                "BUY",
+                                precio,
+                                size,
+                                0,
+                                portfolio.capital
+                            )
+
+                            print(f"🟢 BUY {symbol} | prob: {round(prob,2)}")
+
+                except Exception as e:
+                    print(f"Error compra {symbol}: {e}")
+
+            print(f"💰 Capital: {portfolio.capital}")
+            print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+            print("⏳ Generando datos...\n")
 
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print("ERROR:", e)
+            print(f"❌ ERROR GENERAL: {e}")
             time.sleep(10)
 
+# =========================
+# MAIN
+# =========================
 if __name__ == "__main__":
+
     threading.Thread(target=run_bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
