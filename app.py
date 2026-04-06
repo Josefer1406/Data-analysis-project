@@ -1,97 +1,206 @@
 from flask import Flask, jsonify
-import threading, time, datetime, os
+import threading
+import time
+import datetime
+import os
 import numpy as np
 
-import config, portfolio
-from services.scanner import analizar
-from core.portfolio_manager import asignar_capital
-from core.risk_engine import RiskEngine
-from database import crear_tablas, insertar_trade, obtener_trades
+import config
+import portfolio
+import adaptive
 
+from services.scanner import analizar
+from core.risk import calcular_size
+
+from database import crear_tablas, insertar_trade, obtener_trades
+from ml.train import entrenar
+
+# =========================
+# FLASK APP
+# =========================
 app = Flask(__name__)
 
-risk = RiskEngine()
-peak_capital = 1000
+# =========================
+# RUTA HOME (IMPORTANTE)
+# =========================
+@app.route("/")
+def home():
+    return "🚀 BOT CUANT ACTIVO - API OK"
 
+# =========================
+# API DATA
+# =========================
 @app.route("/data")
 def data():
-    rows = obtener_trades()
-    return jsonify([
-        {
-            "fecha": r[1],
-            "symbol": r[2],
-            "tipo": r[3],
-            "precio": r[4],
-            "size": r[5],
-            "pnl": r[6],
-            "capital": r[7]
-        } for r in rows
-    ])
+    try:
+        rows = obtener_trades()
 
-def bot():
+        data = []
+        for r in rows:
+            data.append({
+                "fecha": r[1],
+                "symbol": r[2],
+                "tipo": r[3],
+                "precio": r[4],
+                "size": r[5],
+                "pnl": r[6],
+                "capital": r[7]
+            })
 
-    global peak_capital
+        return jsonify(data)
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+# =========================
+# BOT LOOP
+# =========================
+def run_bot():
+
+    print("🤖 BOT CUANT INSTITUCIONAL INICIADO")
 
     portfolio.cargar_estado()
     crear_tablas()
 
+    ciclos = 0
+    peak_capital = portfolio.capital
+
     while True:
         try:
-
-            signals = []
-
-            for s in config.CRYPTOS:
-                symbol, score, X, precio = analizar(s)
-
-                prob = np.random.uniform(0.4, 0.7)  # placeholder ML
-                signals.append((symbol, score, prob, precio))
+            ciclos += 1
 
             # =========================
-            # PORTFOLIO ALLOCATION
+            # AUTO-OPTIMIZACIÓN
             # =========================
-            alloc = asignar_capital(
-                [(s, sc, pr) for s, sc, pr, p in signals],
-                portfolio.capital
-            )
+            params = adaptive.ajustar_parametros()
+            MIN_SCORE = params.get("MIN_SCORE", 2)
+            config.RIESGO_POR_TRADE = params.get("RIESGO", 0.02)
+
+            ranking = []
 
             # =========================
-            # RISK CONTROL
+            # SCANNER
             # =========================
-            if not risk.check_drawdown(portfolio.capital, peak_capital):
-                print("STOP TRADING - drawdown")
-                time.sleep(60)
+            for symbol in config.CRYPTOS:
+                try:
+                    score, precio, decision = analizar(symbol)
+                    ranking.append((symbol, score, precio, decision))
+                except Exception as e:
+                    print(f"Error analizando {symbol}: {e}")
+
+            if not ranking:
+                print("⚠️ No hay datos")
+                time.sleep(config.CYCLE_TIME)
                 continue
 
-            peak_capital = max(peak_capital, portfolio.capital)
+            # =========================
+            # ORDENAR
+            # =========================
+            ranking.sort(key=lambda x: x[1], reverse=True)
+            top = ranking[:config.MAX_POSICIONES]
 
             # =========================
-            # EXECUTION
+            # CIERRE DE POSICIONES
             # =========================
-            for symbol, score, prob, precio in signals:
+            for symbol in list(portfolio.posiciones.keys()):
+                try:
+                    precio_actual = next(
+                        (p for s, sc, p, d in ranking if s == symbol),
+                        None
+                    )
 
-                if symbol in alloc:
+                    if precio_actual is None:
+                        continue
 
-                    capital_asignado = alloc[symbol]
-                    size = capital_asignado / precio
+                    if portfolio.evaluar_salida(symbol, precio_actual):
 
-                    if portfolio.abrir_posicion(symbol, precio, size):
+                        size = portfolio.posiciones[symbol]["size"]
+                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
 
                         insertar_trade(
                             datetime.datetime.now(),
                             symbol,
-                            "BUY",
-                            precio,
+                            "SELL",
+                            precio_actual,
                             size,
-                            0,
+                            pnl,
                             portfolio.capital
                         )
+
+                        print(f"🔴 SELL {symbol} | PnL: {pnl}")
+
+                except Exception as e:
+                    print(f"Error cierre {symbol}: {e}")
+
+            # =========================
+            # APERTURA DE POSICIONES
+            # =========================
+            for symbol, score, precio, decision in top:
+                try:
+                    if decision == "BUY" and score >= MIN_SCORE:
+
+                        size = calcular_size(precio)
+
+                        if portfolio.abrir_posicion(symbol, precio, size):
+
+                            insertar_trade(
+                                datetime.datetime.now(),
+                                symbol,
+                                "BUY",
+                                precio,
+                                size,
+                                0,
+                                portfolio.capital
+                            )
+
+                            print(f"🟢 BUY {symbol}")
+
+                except Exception as e:
+                    print(f"Error compra {symbol}: {e}")
+
+            # =========================
+            # CONTROL DE DRAWDOWN
+            # =========================
+            peak_capital = max(peak_capital, portfolio.capital)
+
+            drawdown = (portfolio.capital - peak_capital) / peak_capital
+
+            if drawdown < -0.2:
+                print("🛑 STOP: Drawdown máximo alcanzado")
+                time.sleep(60)
+                continue
+
+            # =========================
+            # AUTO-ML
+            # =========================
+            if ciclos % 10 == 0:
+                print("🧠 Reentrenando modelo...")
+                try:
+                    entrenar()
+                except Exception as e:
+                    print(f"Error entrenamiento ML: {e}")
+
+            # =========================
+            # LOG
+            # =========================
+            print(f"💰 Capital: {portfolio.capital}")
+            print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+            print("⏳ Esperando próximo ciclo...\n")
 
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print("ERROR:", e)
+            print(f"❌ ERROR GENERAL: {e}")
             time.sleep(10)
 
+# =========================
+# MAIN
+# =========================
 if __name__ == "__main__":
-    threading.Thread(target=bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
