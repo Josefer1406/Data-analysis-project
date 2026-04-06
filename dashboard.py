@@ -4,7 +4,7 @@ import numpy as np
 
 st.title("HEDGE FUND DASHBOARD")
 
-url = "https://TU_URL/data"
+url = "https://data-analysis-project-production.up.railway.app/data"
 df = pd.read_json(url)
 
 df["fecha"] = pd.to_datetime(df["fecha"])
