@@ -1,36 +1,25 @@
 from data.exchange import obtener_datos
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
-import numpy as np
-
 from ml.predictor import predecir
-from core.strategies import (
-    trend_following,
-    mean_reversion,
-    momentum,
-    volatility_filter
-)
-from core.ensemble import decision_ensemble
+from database import insertar_features
+import datetime
 
 def analizar(symbol):
 
     df = obtener_datos(symbol)
 
-    df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
-    df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
-    df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
+    df["ema20"] = EMAIndicator(df["close"], 20).ema_indicator()
+    df["ema50"] = EMAIndicator(df["close"], 50).ema_indicator()
+    df["rsi"] = RSIIndicator(df["close"], 14).rsi()
 
     df["volumen"] = df["volume"]
     df["volatilidad"] = df["close"].pct_change().rolling(10).std()
 
     df = df.dropna()
-
     last = df.iloc[-1]
 
-    # =========================
-    # ML
-    # =========================
-    features = {
+    f = {
         "ema20": last["ema20"],
         "ema50": last["ema50"],
         "rsi": last["rsi"],
@@ -38,20 +27,19 @@ def analizar(symbol):
         "volatilidad": last["volatilidad"]
     }
 
-    ml_prob = predecir(features)
+    insertar_features(datetime.datetime.now(), symbol, f)
 
-    # =========================
-    # ESTRATEGIAS
-    # =========================
-    signals = [
-        trend_following(last),
-        mean_reversion(last),
-        momentum(last),
-        volatility_filter(last)
-    ]
+    ml = predecir(f)
 
-    decision = decision_ensemble(signals, ml_prob)
+    trend = 1 if f["ema20"] > f["ema50"] else 0
+    rsi = 1 if f["rsi"] < 35 else 0
+    momentum = 1 if f["rsi"] > 55 else 0
 
-    score = sum(signals)
+    score = trend + rsi + momentum
+
+    if ml > 0.65:
+        score += 2
+
+    decision = "BUY" if score >= 3 else "HOLD"
 
     return score, last["close"], decision

@@ -1,183 +1,77 @@
 from flask import Flask, jsonify
-import threading
-import time
-import os
-import datetime
+import threading, time, datetime, os
 
-import config
-import portfolio
-import adaptive
-
+import config, portfolio, adaptive
 from services.scanner import analizar
 from core.risk import calcular_size
 
 from database import crear_tablas, insertar_trade, obtener_trades
 from ml.train import entrenar
 
-# =========================
-# FLASK
-# =========================
 app = Flask(__name__)
 
-# =========================
-# API
-# =========================
 @app.route("/")
 def home():
-    return "🚀 BOT INSTITUCIONAL + ML + DB ACTIVO"
+    return "SYSTEM LIVE"
 
 @app.route("/data")
 def data():
-    try:
-        rows = obtener_trades()
+    rows = obtener_trades()
+    return jsonify([
+        {
+            "fecha": r[1],
+            "symbol": r[2],
+            "tipo": r[3],
+            "precio": r[4],
+            "size": r[5],
+            "pnl": r[6],
+            "capital": r[7]
+        } for r in rows
+    ])
 
-        data = []
-        for r in rows:
-            data.append({
-                "id": r[0],
-                "fecha": r[1],
-                "symbol": r[2],
-                "tipo": r[3],
-                "precio": r[4],
-                "size": r[5],
-                "pnl": r[6],
-                "capital": r[7]
-            })
-
-        return jsonify(data)
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-# =========================
-# BOT LOOP
-# =========================
-def run_bot():
-
-    print("🤖 BOT INSTITUCIONAL INICIADO")
-
+def bot():
     portfolio.cargar_estado()
     crear_tablas()
-
-    ciclos = 0
+    ciclo = 0
 
     while True:
         try:
-            ciclos += 1
-
+            ciclo += 1
             params = adaptive.ajustar_parametros()
-            MIN_SCORE = params["MIN_SCORE"]
-            config.RIESGO_POR_TRADE = params["RIESGO"]
 
             ranking = []
 
-            # =========================
-            # SCAN DEL MERCADO
-            # =========================
-            for symbol in config.CRYPTOS:
-                try:
-                    score, precio, decision = analizar(symbol)
-                    ranking.append((symbol, score, precio, decision))
-                except Exception as e:
-                    print(f"Error analizando {symbol}: {e}")
+            for s in config.CRYPTOS:
+                sc, p, d = analizar(s)
+                ranking.append((s, sc, p, d))
 
-            if not ranking:
-                time.sleep(config.CYCLE_TIME)
-                continue
-
-            # ordenar por score
             ranking.sort(key=lambda x: x[1], reverse=True)
-            top = ranking[:config.MAX_POSICIONES]
 
-            # =========================
-            # CIERRE DE POSICIONES
-            # =========================
-            for symbol in list(portfolio.posiciones.keys()):
-                try:
-                    precio_actual = next(
-                        (p for s, sc, p, d in ranking if s == symbol),
-                        None
-                    )
+            # CIERRES
+            for s in list(portfolio.posiciones.keys()):
+                precio = next((p for sym, sc, p, d in ranking if sym == s), None)
+                if precio and portfolio.evaluar_salida(s, precio):
+                    size = portfolio.posiciones[s]["size"]
+                    pnl = portfolio.cerrar_posicion(s, precio)
 
-                    if precio_actual is None:
-                        continue
+                    insertar_trade(datetime.datetime.now(), s, "SELL", precio, size, pnl, portfolio.capital)
 
-                    if portfolio.evaluar_salida(symbol, precio_actual):
+            # APERTURAS
+            for s, sc, p, d in ranking[:config.MAX_POSICIONES]:
+                if d == "BUY":
+                    size = calcular_size(p)
+                    if portfolio.abrir_posicion(s, p, size):
+                        insertar_trade(datetime.datetime.now(), s, "BUY", p, size, 0, portfolio.capital)
 
-                        size = portfolio.posiciones[symbol]["size"]
-                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
-
-                        insertar_trade(
-                            datetime.datetime.now(),
-                            symbol,
-                            "SELL",
-                            precio_actual,
-                            size,
-                            pnl,
-                            portfolio.capital
-                        )
-
-                        print(f"🔴 SELL {symbol} | PnL: {pnl}")
-
-                except Exception as e:
-                    print(f"Error cierre {symbol}: {e}")
-
-            # =========================
-            # APERTURA DE POSICIONES
-            # =========================
-            for symbol, score, precio, decision in top:
-                try:
-                    if decision == "BUY":
-
-                        size = calcular_size(precio)
-
-                        if portfolio.abrir_posicion(symbol, precio, size):
-
-                            insertar_trade(
-                                datetime.datetime.now(),
-                                symbol,
-                                "BUY",
-                                precio,
-                                size,
-                                0,
-                                portfolio.capital
-                            )
-
-                            print(f"🟢 BUY {symbol}")
-
-                except Exception as e:
-                    print(f"Error compra {symbol}: {e}")
-
-            # =========================
-            # AUTO-ENTRENAMIENTO ML
-            # =========================
-            if ciclos % 10 == 0:
-                print("🧠 Reentrenando modelo...")
+            if ciclo % 10 == 0:
                 entrenar()
-
-            # =========================
-            # INFO
-            # =========================
-            print(f"💰 Capital: {portfolio.capital}")
-            print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print("⏳ Esperando próximo ciclo...\n")
 
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR GENERAL: {e}")
+            print("ERROR:", e)
             time.sleep(10)
 
-# =========================
-# MAIN
-# =========================
 if __name__ == "__main__":
-
-    # ejecutar bot en segundo plano
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-
-    # levantar API
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    threading.Thread(target=bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

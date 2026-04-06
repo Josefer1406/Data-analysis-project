@@ -1,23 +1,12 @@
-from ml.model import cargar_modelo
 import numpy as np
+from ml.model import cargar
 
-model = cargar_modelo()
+model = cargar()
 
-def predecir(features_dict):
-
+def predecir(f):
     global model
-
     if model is None:
-        return 0.5  # neutral
+        return 0.5
 
-    X = np.array([[
-        features_dict["ema20"],
-        features_dict["ema50"],
-        features_dict["rsi"],
-        features_dict["volumen"],
-        features_dict["volatilidad"]
-    ]])
-
-    prob = model.predict_proba(X)[0][1]
-
-    return prob
+    X = np.array([[f["ema20"], f["ema50"], f["rsi"], f["volumen"], f["volatilidad"]]])
+    return model.predict_proba(X)[0][1]

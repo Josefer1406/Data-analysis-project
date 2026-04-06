@@ -1,13 +1,13 @@
 import joblib
 import os
 
-MODEL_PATH = "ml/model.pkl"
+PATH = "ml/model.pkl"
 
-def guardar_modelo(modelo):
+def guardar(model):
     os.makedirs("ml", exist_ok=True)
-    joblib.dump(modelo, MODEL_PATH)
+    joblib.dump(model, PATH)
 
-def cargar_modelo():
-    if os.path.exists(MODEL_PATH):
-        return joblib.load(MODEL_PATH)
+def cargar():
+    if os.path.exists(PATH):
+        return joblib.load(PATH)
     return None

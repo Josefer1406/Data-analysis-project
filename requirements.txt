@@ -1,9 +1,8 @@
 flask
 pandas
+numpy
 psycopg2-binary
-requests
-streamlit
 scikit-learn
 joblib
 ta
-numpy
+streamlit

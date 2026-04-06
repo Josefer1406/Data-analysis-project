@@ -6,7 +6,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def conectar():
     result = urlparse(DATABASE_URL)
-
     return psycopg2.connect(
         database=result.path[1:],
         user=result.username,
@@ -32,6 +31,19 @@ def crear_tablas():
     );
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS features (
+        id SERIAL PRIMARY KEY,
+        fecha TIMESTAMP,
+        symbol TEXT,
+        ema20 FLOAT,
+        ema50 FLOAT,
+        rsi FLOAT,
+        volumen FLOAT,
+        volatilidad FLOAT
+    );
+    """)
+
     conn.commit()
     cur.close()
     conn.close()
@@ -41,9 +53,26 @@ def insertar_trade(fecha, symbol, tipo, precio, size, pnl, capital):
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO trades (fecha, symbol, tipo, precio, size, pnl, capital)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO trades (fecha, symbol, tipo, precio, size, pnl, capital)
+    VALUES (%s,%s,%s,%s,%s,%s,%s)
     """, (fecha, symbol, tipo, precio, size, pnl, capital))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def insertar_features(fecha, symbol, f):
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO features (fecha, symbol, ema20, ema50, rsi, volumen, volatilidad)
+    VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        fecha, symbol,
+        f["ema20"], f["ema50"], f["rsi"],
+        f["volumen"], f["volatilidad"]
+    ))
 
     conn.commit()
     cur.close()
@@ -52,11 +81,8 @@ def insertar_trade(fecha, symbol, tipo, precio, size, pnl, capital):
 def obtener_trades():
     conn = conectar()
     cur = conn.cursor()
-
-    cur.execute("SELECT * FROM trades ORDER BY fecha ASC;")
+    cur.execute("SELECT * FROM trades ORDER BY fecha ASC")
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
-
     return rows
