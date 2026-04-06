@@ -1,25 +1,59 @@
-CAPITAL_INICIAL = 1000
-RIESGO_POR_TRADE = 0.03
+# =========================
+# CAPITAL INICIAL
+# =========================
+CAPITAL_INICIAL = 1000  # puedes cambiarlo
 
-TIMEFRAME = "5m"
+# =========================
+# RIESGO
+# =========================
+RIESGO_POR_TRADE = 0.02  # 2% base (se ajusta dinámicamente)
 
+# =========================
+# TIEMPO ENTRE CICLOS (segundos)
+# =========================
+CYCLE_TIME = 60  # cada 1 minuto
+
+# =========================
+# MÁXIMO DE POSICIONES ABIERTAS
+# =========================
+MAX_POSICIONES = 3
+
+# =========================
+# CRYPTOS A ANALIZAR
+# =========================
 CRYPTOS = [
+    # principales
     "BTC/USDT",
     "ETH/USDT",
     "SOL/USDT",
     "XRP/USDT",
-    "ADA/USDT"
+    "ADA/USDT",
+
+    # alta liquidez
+    "LTC/USDT",
+    "LINK/USDT",
+
+    # crecimiento / altcoins fuertes
+    "AVAX/USDT",
+    "MATIC/USDT",
+    "ATOM/USDT",
+
+    # más volátiles (más riesgo)
+    "DOGE/USDT"
 ]
 
-MAX_POSICIONES = 3
-CYCLE_TIME = 60
+# =========================
+# PARÁMETROS ADAPTATIVOS
+# =========================
+MIN_SCORE_BASE = 2   # mínimo para considerar entrada
 
-# PARAMETROS OPTIMIZADOS
-EMA_FAST = 20
-EMA_SLOW = 60
+# =========================
+# LÍMITES DE SEGURIDAD
+# =========================
+MAX_RIESGO = 0.1     # máximo 10% del capital por trade
 
-RSI_LOW = 35
-RSI_HIGH = 70
-
-# Parámetros base (se ajustan dinámicamente)
-MIN_SCORE_BASE = 3
+# =========================
+# STOP LOSS / TAKE PROFIT
+# =========================
+STOP_LOSS = -0.02    # -2%
+TAKE_PROFIT = 0.05   # +5%
