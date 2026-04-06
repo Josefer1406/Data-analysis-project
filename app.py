@@ -19,11 +19,11 @@ from database import crear_tablas, insertar_trade, obtener_trades
 app = Flask(__name__)
 
 # =========================
-# RUTAS API
+# API
 # =========================
 @app.route("/")
 def home():
-    return "🚀 BOT CUANT ACTIVO - API OK"
+    return "🚀 BOT CUANT PROFESIONAL ACTIVO"
 
 @app.route("/data")
 def data():
@@ -42,17 +42,24 @@ def data():
     ])
 
 # =========================
-# BOT LOOP
+# BOT
 # =========================
 def run_bot():
 
-    print("🤖 BOT INICIADO (MODO FORZADO)")
+    print("🤖 BOT PROFESIONAL INICIADO")
 
     portfolio.cargar_estado()
     crear_tablas()
 
+    ciclos = 0
+
     while True:
         try:
+            ciclos += 1
+
+            params = adaptive.ajustar_parametros()
+            MIN_SCORE = params.get("MIN_SCORE", 2)
+            config.RIESGO_POR_TRADE = params.get("RIESGO", 0.02)
 
             ranking = []
 
@@ -67,36 +74,75 @@ def run_bot():
                     print(f"Error analizando {symbol}: {e}")
 
             if not ranking:
-                print("⚠️ No hay datos del scanner")
+                print("⚠️ No hay datos")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # FORZAR COMPRAS (DEBUG)
-            # =========================
-            for symbol, score, precio, decision in ranking:
-                try:
-                    size = calcular_size(precio)
+            ranking.sort(key=lambda x: x[1], reverse=True)
+            top = ranking[:config.MAX_POSICIONES]
 
-                    if portfolio.abrir_posicion(symbol, precio, size):
+            # =========================
+            # CIERRE
+            # =========================
+            for symbol in list(portfolio.posiciones.keys()):
+                try:
+                    precio_actual = next(
+                        (p for s, sc, p, d in ranking if s == symbol),
+                        None
+                    )
+
+                    if precio_actual is None:
+                        continue
+
+                    if portfolio.evaluar_salida(symbol, precio_actual):
+
+                        size = portfolio.posiciones[symbol]["size"]
+                        pnl = portfolio.cerrar_posicion(symbol, precio_actual)
 
                         insertar_trade(
                             datetime.datetime.now(),
                             symbol,
-                            "BUY",
-                            precio,
+                            "SELL",
+                            precio_actual,
                             size,
-                            0,
+                            pnl,
                             portfolio.capital
                         )
 
-                        print(f"🟢 BUY FORZADO {symbol}")
+                        print(f"🔴 SELL {symbol} | PnL: {pnl}")
+
+                except Exception as e:
+                    print(f"Error cierre {symbol}: {e}")
+
+            # =========================
+            # APERTURA (YA NO FORZADO)
+            # =========================
+            for symbol, score, precio, decision in top:
+                try:
+                    if decision == "BUY" and score >= MIN_SCORE:
+
+                        size = calcular_size(precio)
+
+                        if portfolio.abrir_posicion(symbol, precio, size):
+
+                            insertar_trade(
+                                datetime.datetime.now(),
+                                symbol,
+                                "BUY",
+                                precio,
+                                size,
+                                0,
+                                portfolio.capital
+                            )
+
+                            print(f"🟢 BUY {symbol}")
 
                 except Exception as e:
                     print(f"Error compra {symbol}: {e}")
 
             print(f"💰 Capital: {portfolio.capital}")
-            print("⏳ Esperando siguiente ciclo...\n")
+            print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+            print("⏳ Esperando...\n")
 
             time.sleep(config.CYCLE_TIME)
 
@@ -109,9 +155,7 @@ def run_bot():
 # =========================
 if __name__ == "__main__":
 
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
+    threading.Thread(target=run_bot, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
