@@ -1,6 +1,7 @@
 from data.exchange import obtener_datos
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
+from ml.predictor import predecir
 import numpy as np
 
 def analizar(symbol):
@@ -10,19 +11,40 @@ def analizar(symbol):
     df["ema20"] = EMAIndicator(df["close"], 20).ema_indicator()
     df["ema50"] = EMAIndicator(df["close"], 50).ema_indicator()
     df["rsi"] = RSIIndicator(df["close"], 14).rsi()
-    df["ret"] = df["close"].pct_change()
+
+    df["volumen"] = df["volume"]
+    df["volatilidad"] = df["close"].pct_change().rolling(10).std()
 
     df = df.dropna()
     last = df.iloc[-1]
 
-    # FEATURES
-    X = np.array([[last["ema20"], last["ema50"], last["rsi"], last["ret"]]])
+    features = {
+        "ema20": last["ema20"],
+        "ema50": last["ema50"],
+        "rsi": last["rsi"],
+        "volumen": last["volumen"],
+        "volatilidad": last["volatilidad"]
+    }
 
-    # SCORE BASE
+    prob = predecir(features)
+
+    # =========================
+    # MULTI-ESTRATEGIA
+    # =========================
     score = 0
+
     if last["ema20"] > last["ema50"]:
         score += 1
-    if last["rsi"] < 40:
+
+    if last["rsi"] < 35:
         score += 1
 
-    return symbol, score, X, last["close"]
+    if last["rsi"] > 55:
+        score += 1
+
+    if prob > 0.6:
+        score += 2
+
+    decision = "BUY" if score >= 3 else "HOLD"
+
+    return score, last["close"], decision
