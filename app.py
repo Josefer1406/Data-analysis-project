@@ -1,18 +1,17 @@
 from flask import Flask, jsonify
 import threading, time, datetime, os
+import numpy as np
 
-import config, portfolio, adaptive
+import config, portfolio
 from services.scanner import analizar
-from core.risk import calcular_size
-
+from core.portfolio_manager import asignar_capital
+from core.risk_engine import RiskEngine
 from database import crear_tablas, insertar_trade, obtener_trades
-from ml.train import entrenar
 
 app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "SYSTEM LIVE"
+risk = RiskEngine()
+peak_capital = 1000
 
 @app.route("/data")
 def data():
@@ -30,41 +29,62 @@ def data():
     ])
 
 def bot():
+
+    global peak_capital
+
     portfolio.cargar_estado()
     crear_tablas()
-    ciclo = 0
 
     while True:
         try:
-            ciclo += 1
-            params = adaptive.ajustar_parametros()
 
-            ranking = []
+            signals = []
 
             for s in config.CRYPTOS:
-                sc, p, d = analizar(s)
-                ranking.append((s, sc, p, d))
+                symbol, score, X, precio = analizar(s)
 
-            ranking.sort(key=lambda x: x[1], reverse=True)
+                prob = np.random.uniform(0.4, 0.7)  # placeholder ML
+                signals.append((symbol, score, prob, precio))
 
-            # CIERRES
-            for s in list(portfolio.posiciones.keys()):
-                precio = next((p for sym, sc, p, d in ranking if sym == s), None)
-                if precio and portfolio.evaluar_salida(s, precio):
-                    size = portfolio.posiciones[s]["size"]
-                    pnl = portfolio.cerrar_posicion(s, precio)
+            # =========================
+            # PORTFOLIO ALLOCATION
+            # =========================
+            alloc = asignar_capital(
+                [(s, sc, pr) for s, sc, pr, p in signals],
+                portfolio.capital
+            )
 
-                    insertar_trade(datetime.datetime.now(), s, "SELL", precio, size, pnl, portfolio.capital)
+            # =========================
+            # RISK CONTROL
+            # =========================
+            if not risk.check_drawdown(portfolio.capital, peak_capital):
+                print("STOP TRADING - drawdown")
+                time.sleep(60)
+                continue
 
-            # APERTURAS
-            for s, sc, p, d in ranking[:config.MAX_POSICIONES]:
-                if d == "BUY":
-                    size = calcular_size(p)
-                    if portfolio.abrir_posicion(s, p, size):
-                        insertar_trade(datetime.datetime.now(), s, "BUY", p, size, 0, portfolio.capital)
+            peak_capital = max(peak_capital, portfolio.capital)
 
-            if ciclo % 10 == 0:
-                entrenar()
+            # =========================
+            # EXECUTION
+            # =========================
+            for symbol, score, prob, precio in signals:
+
+                if symbol in alloc:
+
+                    capital_asignado = alloc[symbol]
+                    size = capital_asignado / precio
+
+                    if portfolio.abrir_posicion(symbol, precio, size):
+
+                        insertar_trade(
+                            datetime.datetime.now(),
+                            symbol,
+                            "BUY",
+                            precio,
+                            size,
+                            0,
+                            portfolio.capital
+                        )
 
             time.sleep(config.CYCLE_TIME)
 
