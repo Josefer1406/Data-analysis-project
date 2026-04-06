@@ -2,7 +2,6 @@ from data.exchange import obtener_datos
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
 from ml.predictor import predecir
-import numpy as np
 
 def analizar(symbol):
 
@@ -28,23 +27,21 @@ def analizar(symbol):
 
     prob = predecir(features)
 
-    # =========================
-    # MULTI-ESTRATEGIA
-    # =========================
     score = 0
 
+    # tendencia fuerte
     if last["ema20"] > last["ema50"]:
         score += 1
 
-    if last["rsi"] < 35:
+    # entrada en pullback sano
+    if 40 < last["rsi"] < 60:
         score += 1
 
-    if last["rsi"] > 55:
-        score += 1
-
-    if prob > 0.6:
+    # ML fuerte
+    if prob > 0.65:
         score += 2
 
+    # FILTRO DURO
     decision = "BUY" if score >= 3 else "HOLD"
 
     return score, last["close"], decision

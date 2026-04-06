@@ -2,18 +2,18 @@ from data.exchange import obtener_datos
 from ta.trend import EMAIndicator
 
 def mercado_favorable():
-    print("🌎 Analizando BTC...")
+    try:
+        df = obtener_datos("BTC/USDT")
 
-    df = obtener_datos("BTC/USDT")
+        df["ema50"] = EMAIndicator(df["close"], 50).ema_indicator()
+        df["ema200"] = EMAIndicator(df["close"], 200).ema_indicator()
 
-    df["ema50"] = EMAIndicator(df["close"], window=50).ema_indicator()
-    df["ema200"] = EMAIndicator(df["close"], window=200).ema_indicator()
+        df = df.dropna()
+        last = df.iloc[-1]
 
-    last = df.iloc[-1]
+        # mercado alcista
+        return last["ema50"] > last["ema200"]
 
-    if last["ema50"] > last["ema200"]:
-        print("🚀 Mercado alcista")
-        return "ALCISTA"
-    else:
-        print("⚠️ Mercado débil")
-        return "DEBIL"
+    except Exception as e:
+        print(f"Error filtro mercado: {e}")
+        return False
