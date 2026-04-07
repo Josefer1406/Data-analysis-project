@@ -1,11 +1,13 @@
+import numpy as np
+
 def asignar_capital(candidatos, capital_total, max_posiciones):
+    """
+    candidatos = [(symbol, score, prob, precio)]
+    """
 
-    # candidatos: [(symbol, score, prob, precio)]
-
-    # ordenar por probabilidad (mejor primero)
+    # ordenar por probabilidad
     candidatos = sorted(candidatos, key=lambda x: x[2], reverse=True)
 
-    # seleccionar top
     seleccion = candidatos[:max_posiciones]
 
     # suma de probabilidades
@@ -20,8 +22,10 @@ def asignar_capital(candidatos, capital_total, max_posiciones):
         else:
             peso = prob / total_prob
 
+        capital_asignado = capital_total * peso
+
         allocation[symbol] = {
-            "capital": capital_total * peso,
+            "capital": capital_asignado,
             "precio": precio
         }
 
