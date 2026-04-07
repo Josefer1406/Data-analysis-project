@@ -9,7 +9,7 @@ import portfolio
 
 from services.scanner import analizar
 from core.risk import calcular_size
-from database import crear_tablas, insertar_trade, obtener_trades
+from database import crear_tablas, insertar_trade, obtener_trades, reset_database
 
 app = Flask(__name__)
 
@@ -18,7 +18,7 @@ app = Flask(__name__)
 # =========================
 @app.route("/")
 def home():
-    return "🚀 QUANT ENGINE - ENTRENAMIENTO ESTABLE"
+    return "🚀 QUANT BOT INSTITUCIONAL ACTIVO"
 
 @app.route("/data")
 def data():
@@ -37,14 +37,18 @@ def data():
     ])
 
 # =========================
-# BOT ENGINE
+# BOT
 # =========================
 def run_bot():
 
-    print("🚀 ENGINE INSTITUCIONAL (FASE ENTRENAMIENTO)")
+    print("🚀 BOT INICIADO")
 
     portfolio.cargar_estado()
     crear_tablas()
+
+    # 🔥 RESET SOLO UNA VEZ
+    if os.getenv("RESET_DB") == "1":
+        reset_database()
 
     while True:
         try:
@@ -53,14 +57,10 @@ def run_bot():
 
             ranking = []
 
-            # =========================
-            # SCANNER
-            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
 
-                    # 🔥 convertir numpy → python
                     precio = float(precio)
                     prob = float(prob)
 
@@ -76,11 +76,7 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # ORDENAMIENTO
-            # =========================
             ranking.sort(key=lambda x: (x[1], x[4]), reverse=True)
-
             top = ranking[:config.MAX_POSICIONES]
 
             print("\n🏆 TOP OPORTUNIDADES:")
@@ -93,9 +89,9 @@ def run_bot():
             for symbol in list(portfolio.posiciones.keys()):
 
                 precio_actual = next(
-    (p for s, sc, p, d, pr in ranking if s == symbol),
-    None
-)
+                    (p for s, sc, p, d, pr in ranking if s == symbol),
+                    None
+                )
 
                 if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
 
@@ -115,11 +111,10 @@ def run_bot():
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
             # =========================
-            # APERTURAS (🔥 CLAVE)
+            # APERTURAS
             # =========================
             for symbol, score, precio, decision, prob in top:
 
-                # 🔥 ignoramos decision ML en entrenamiento
                 if score >= 1:
 
                     size = calcular_size(precio, score, prob)
@@ -140,12 +135,12 @@ def run_bot():
 
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print("⏳ Entrenando...\n")
+            print("⏳ Ciclo completado...\n")
 
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR CRÍTICO: {e}")
+            print(f"❌ ERROR: {e}")
             time.sleep(10)
 
 # =========================
