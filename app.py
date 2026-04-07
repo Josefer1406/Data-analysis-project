@@ -9,7 +9,7 @@ import portfolio
 
 from services.scanner import analizar
 from core.portfolio_optimizer import optimizar_portafolio
-from database import crear_tablas, insertar_trade, obtener_trades
+from database import crear_tablas, insertar_trade, obtener_trades, reset_database
 
 app = Flask(__name__)
 
@@ -35,10 +35,17 @@ def data():
 
 def run_bot():
 
-    print("🚀 SISTEMA CUANT INSTITUCIONAL FINAL")
+    print("🚀 SISTEMA CUANT INSTITUCIONAL")
 
     portfolio.cargar_estado()
     crear_tablas()
+
+    # =========================
+    # RESET CONTROLADO
+    # =========================
+    if os.getenv("RESET_DB") == "1":
+        print("🧹 Ejecutando RESET...")
+        reset_database()
 
     while True:
         try:
@@ -67,16 +74,13 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # OPTIMIZACIÓN REAL
-            # =========================
             allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
                 config.MAX_POSICIONES
             )
 
-            print("\n🏆 PORTFOLIO ÓPTIMO:")
+            print("\n🏆 PORTAFOLIO ÓPTIMO:")
             print(allocation)
 
             # =========================
@@ -107,7 +111,7 @@ def run_bot():
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
             # =========================
-            # APERTURAS ÓPTIMAS
+            # APERTURAS
             # =========================
             for symbol, data_alloc in allocation.items():
 
