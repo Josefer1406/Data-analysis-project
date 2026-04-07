@@ -36,11 +36,14 @@ def data():
         } for r in rows
     ])
 
-# 🔥 NUEVO: RESET MANUAL
+# =========================
+# 🔥 RESET TOTAL
+# =========================
 @app.route("/reset")
 def reset():
     reset_database()
-    return "🧹 DATABASE RESETEADA"
+    portfolio.reset_portfolio()
+    return "🧹 RESET TOTAL: DB + CAPITAL + POSICIONES"
 
 # =========================
 # BOT ENGINE
@@ -59,6 +62,9 @@ def run_bot():
 
             candidatos = []
 
+            # =========================
+            # SCANNER
+            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
@@ -79,6 +85,9 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
+            # =========================
+            # OPTIMIZACIÓN PORTAFOLIO
+            # =========================
             allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
@@ -120,6 +129,7 @@ def run_bot():
             # =========================
             for symbol, data_alloc in allocation.items():
 
+                # 🔥 evitar sobrecompra
                 if symbol in portfolio.posiciones:
                     continue
 
@@ -140,8 +150,11 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🟢 BUY {symbol}")
+                    print(f"🟢 BUY {symbol} | peso: {round(data_alloc['peso'],2)}")
 
+            # =========================
+            # ESTADO
+            # =========================
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print("⏳ Ciclo completado...\n")
