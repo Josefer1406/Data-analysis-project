@@ -14,6 +14,7 @@ def capital_disponible():
 def abrir_posicion(symbol, precio, size):
     global capital
 
+    # 🔥 BLOQUEO CRÍTICO
     if symbol in posiciones:
         return False
 
@@ -22,7 +23,6 @@ def abrir_posicion(symbol, precio, size):
 
     costo = precio * size
 
-    # 🔥 usar capital disponible (no todo)
     if costo > capital_disponible():
         return False
 
@@ -75,9 +75,8 @@ def evaluar_salida(symbol, precio):
 def cargar_estado():
     global capital
 
-    # 🔥 protección contra capital roto
     if capital < config.MIN_CAPITAL_OPERAR:
-        print("⚠️ Capital demasiado bajo, reiniciando")
+        print("⚠️ Capital bajo, reiniciando")
         capital = config.CAPITAL_INICIAL
 
     print(f"💰 Capital inicial: {capital}")
