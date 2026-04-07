@@ -1,13 +1,23 @@
-import joblib
-import os
+import random
 
-PATH = "ml/model.pkl"
+def analizar_activo(symbol):
+    """
+    Modelo multi-factor institucional (simulado por ahora)
+    """
 
-def guardar(model):
-    os.makedirs("ml", exist_ok=True)
-    joblib.dump(model, PATH)
+    tendencia = random.choice([True, False])
+    momentum = random.choice([True, False])
+    volatilidad = random.choice([True, False])
 
-def cargar():
-    if os.path.exists(PATH):
-        return joblib.load(PATH)
-    return None
+    score = 0
+    if tendencia: score += 1
+    if momentum: score += 1
+    if volatilidad: score += 1
+
+    probabilidad = score / 3
+
+    return {
+        "symbol": symbol,
+        "score": score,
+        "probabilidad": probabilidad
+    }
