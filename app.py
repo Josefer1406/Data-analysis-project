@@ -13,9 +13,12 @@ from database import crear_tablas, insertar_trade, obtener_trades, reset_databas
 
 app = Flask(__name__)
 
+# =========================
+# API
+# =========================
 @app.route("/")
 def home():
-    return "🚀 QUANT FUND ENGINE FINAL"
+    return "🚀 QUANT FUND ENGINE FINAL ESTABLE"
 
 @app.route("/data")
 def data():
@@ -33,15 +36,18 @@ def data():
         } for r in rows
     ])
 
+# =========================
+# BOT ENGINE
+# =========================
 def run_bot():
 
-    print("🚀 SISTEMA CUANT INSTITUCIONAL")
+    print("🚀 SISTEMA CUANT INSTITUCIONAL ESTABLE")
 
     portfolio.cargar_estado()
     crear_tablas()
 
     # =========================
-    # RESET CONTROLADO
+    # RESET CONTROLADO (opcional)
     # =========================
     if os.getenv("RESET_DB") == "1":
         print("🧹 Ejecutando RESET...")
@@ -54,6 +60,9 @@ def run_bot():
 
             candidatos = []
 
+            # =========================
+            # SCANNER
+            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
@@ -74,6 +83,9 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
+            # =========================
+            # OPTIMIZACIÓN PORTAFOLIO
+            # =========================
             allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
@@ -111,9 +123,13 @@ def run_bot():
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
             # =========================
-            # APERTURAS
+            # APERTURAS (CONTROLADAS)
             # =========================
             for symbol, data_alloc in allocation.items():
+
+                # 🔥 evitar sobrecompra
+                if symbol in portfolio.posiciones:
+                    continue
 
                 precio = data_alloc["precio"]
                 capital_asignado = data_alloc["capital"]
@@ -134,6 +150,9 @@ def run_bot():
 
                     print(f"🟢 BUY {symbol} | peso: {round(data_alloc['peso'],2)}")
 
+            # =========================
+            # ESTADO
+            # =========================
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print("⏳ Ciclo completado...\n")
@@ -141,10 +160,14 @@ def run_bot():
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR: {e}")
+            print(f"❌ ERROR CRÍTICO: {e}")
             time.sleep(10)
 
+# =========================
+# MAIN
+# =========================
 if __name__ == "__main__":
+
     threading.Thread(target=run_bot, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
