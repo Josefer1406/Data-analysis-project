@@ -3,41 +3,50 @@ import config
 
 def optimizar_portafolio(candidatos, capital_total, max_posiciones):
 
-    if capital_total < config.MIN_CAPITAL_OPERAR:
+    if not candidatos:
         return {}
-
-    candidatos = sorted(candidatos, key=lambda x: x[2], reverse=True)
-    candidatos = candidatos[:max_posiciones]
-
-    probs = np.array([c[2] for c in candidatos])
-
-    # 🔥 penalizar probabilidades medias
-    probs = np.power(probs, 2)
-
-    probs = np.clip(probs, 0.01, 1)
-
-    pesos = probs / probs.sum()
 
     allocation = {}
 
-    for i, (symbol, score, prob, precio) in enumerate(candidatos):
+    # 🔥 Ordenar por probabilidad (convicción)
+    candidatos = sorted(candidatos, key=lambda x: x[2], reverse=True)
 
-        capital_asignado = float(capital_total * pesos[i])
+    capital_disponible = capital_total
 
-        # 🔥 límite institucional (MUY IMPORTANTE)
-        max_capital_asset = capital_total * 0.3
+    total_asignado = 0
+    posiciones = 0
 
-        capital_asignado = min(capital_asignado, max_capital_asset)
+    for symbol, score, prob, precio in candidatos:
 
-        # 🔥 mínimo realista
-        if capital_asignado < 30:
+        if posiciones >= max_posiciones:
+            break
+
+        # 🚫 NO TRADE SI NO HAY EDGE
+        if prob < 0.6:
             continue
 
+        # 🎯 CLASIFICACIÓN INSTITUCIONAL
+        if prob >= 0.9:
+            peso = 0.30   # 🔥 EXCELENTE
+        elif prob >= 0.75:
+            peso = 0.20   # buena
+        else:
+            peso = 0.15   # normal
+
+        # 🚫 CONTROL DE RIESGO GLOBAL
+        if total_asignado + peso > 0.60:
+            break
+
+        capital_asignado = capital_total * peso
+
         allocation[symbol] = {
-            "capital": capital_asignado,
+            "capital": float(capital_asignado),
             "precio": float(precio),
-            "peso": float(pesos[i]),
+            "peso": float(peso),
             "conviccion": float(prob)
         }
+
+        total_asignado += peso
+        posiciones += 1
 
     return allocation
