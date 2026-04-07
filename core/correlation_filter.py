@@ -1,13 +1,18 @@
-import numpy as np
+import pandas as pd
 
-def filtrar_correlacion(df_prices, threshold=0.8):
+def filtrar_correlacion(precios_dict, threshold=0.8):
 
-    # correlación entre activos
-    corr = df_prices.pct_change().corr()
+    df = pd.DataFrame(precios_dict)
+
+    if df.shape[1] < 2:
+        return list(precios_dict.keys())
+
+    corr = df.pct_change().corr()
 
     seleccionados = []
 
     for col in corr.columns:
+
         alta_corr = False
 
         for sel in seleccionados:
