@@ -1,91 +1,155 @@
 import config
+import numpy as np
 
-capital = float(config.CAPITAL_INICIAL)
-posiciones = {}
+class Portfolio:
 
-STOP_LOSS = config.STOP_LOSS
-TAKE_PROFIT = config.TAKE_PROFIT
+    def __init__(self):
+        self.capital = config.CAPITAL_INICIAL
+        self.posiciones = {}  # {symbol: {precio, capital}}
+        self.historial = []
 
+    # ============================
+    # 🧠 CORRELACIÓN SIMPLE (PROXY)
+    # ============================
+    def correlacion_alta(self, symbol, posiciones_actuales):
+        # Proxy simple: evita duplicar tipo de activo (L1)
+        base = symbol.split("/")[0]
 
-def capital_disponible():
-    return capital * (1 - config.RESERVA_CAPITAL)
+        for pos in posiciones_actuales:
+            if pos.split("/")[0] == base:
+                return True
 
-
-def abrir_posicion(symbol, precio, size):
-    global capital
-
-    if symbol in posiciones:
         return False
 
-    if len(posiciones) >= config.MAX_POSICIONES:
-        return False
+    # ============================
+    # 📊 POSITION SIZING PRO
+    # ============================
+    def calcular_peso(self, prob):
 
-    costo = precio * size
+        if prob >= 0.80:
+            return config.MAX_PESO_EXCELENTE   # 30%
+        elif prob >= 0.65:
+            return config.MAX_PESO_BUENO       # 20%
+        else:
+            return config.MAX_PESO_NORMAL      # 15%
 
-    if costo > capital_disponible():
-        return False
+    # ============================
+    # 🧠 FILTRO DE ENTRADA
+    # ============================
+    def puede_comprar(self, symbol, prob):
 
-    capital -= costo
+        if prob < config.MIN_PROBABILIDAD:
+            return False
 
-    posiciones[symbol] = {
-        "precio": precio,
-        "size": size
-    }
+        if symbol in self.posiciones:
+            return False
 
-    return True
+        if len(self.posiciones) >= config.MAX_POSICIONES:
+            return False
 
+        if self.correlacion_alta(symbol, self.posiciones):
+            return False
 
-def cerrar_posicion(symbol, precio):
-    global capital
+        if self.capital < config.MIN_CAPITAL_OPERAR:
+            return False
 
-    pos = posiciones[symbol]
-
-    pnl = (precio - pos["precio"]) * pos["size"]
-
-    capital += pos["size"] * precio
-
-    del posiciones[symbol]
-
-    return pnl
-
-
-def evaluar_salida(symbol, precio):
-
-    if symbol not in posiciones:
-        return False
-
-    pos = posiciones[symbol]
-
-    pnl = (precio - pos["precio"]) / pos["precio"]
-
-    print(f"🔍 {symbol} pnl: {round(pnl,4)}")
-
-    if pnl <= STOP_LOSS:
-        print(f"🛑 STOP LOSS {symbol}")
         return True
 
-    if pnl >= TAKE_PROFIT:
-        print(f"🎯 TAKE PROFIT {symbol}")
-        return True
+    # ============================
+    # 🏆 CONSTRUCCIÓN PORTAFOLIO
+    # ============================
+    def construir_portafolio(self, oportunidades):
 
-    return False
+        oportunidades = sorted(oportunidades, key=lambda x: x[2], reverse=True)
 
+        portafolio = {}
 
-def cargar_estado():
-    global capital
+        capital_disponible = self.capital * config.MAX_EXPOSICION_TOTAL
 
-    if capital < config.MIN_CAPITAL_OPERAR:
-        print("⚠️ Capital bajo, reiniciando")
-        capital = config.CAPITAL_INICIAL
+        for symbol, score, prob, precio in oportunidades:
 
-    print(f"💰 Capital inicial: {capital}")
+            if not self.puede_comprar(symbol, prob):
+                continue
 
+            peso = self.calcular_peso(prob)
 
-# 🔥 NUEVO RESET TOTAL
-def reset_portfolio():
-    global capital, posiciones
+            capital_asignado = capital_disponible * peso
 
-    capital = float(config.CAPITAL_INICIAL)
-    posiciones = {}
+            if capital_asignado > self.capital:
+                capital_asignado = self.capital
 
-    print("🔄 Portfolio reiniciado a 1000 USDT")
+            portafolio[symbol] = {
+                "capital": float(capital_asignado),
+                "precio": float(precio),
+                "peso": float(peso),
+                "conviccion": float(prob)
+            }
+
+        return portafolio
+
+    # ============================
+    # 🟢 EJECUCIÓN DE COMPRA
+    # ============================
+    def ejecutar_compras(self, portafolio):
+
+        for symbol, data in portafolio.items():
+
+            if symbol in self.posiciones:
+                continue
+
+            if self.capital <= 0:
+                break
+
+            capital = data["capital"]
+
+            if capital > self.capital:
+                capital = self.capital
+
+            self.posiciones[symbol] = {
+                "precio": data["precio"],
+                "capital": capital
+            }
+
+            self.capital -= capital
+
+            print(f"🟢 BUY {symbol} | convicción: {data['conviccion']:.2f}")
+
+    # ============================
+    # 🔴 CONTROL DE SALIDA (PRO)
+    # ============================
+    def evaluar_salidas(self, precios_actuales):
+
+        eliminar = []
+
+        for symbol, pos in self.posiciones.items():
+
+            precio_actual = precios_actuales.get(symbol)
+
+            if not precio_actual:
+                continue
+
+            pnl = (precio_actual - pos["precio"]) / pos["precio"]
+
+            print(f"🔍 {symbol} pnl: {round(pnl,4)}")
+
+            # STOP LOSS
+            if pnl <= -config.STOP_LOSS:
+                print(f"🔴 STOP LOSS {symbol}")
+                self.capital += pos["capital"]
+                eliminar.append(symbol)
+
+            # TAKE PROFIT DINÁMICO
+            elif pnl >= config.TAKE_PROFIT:
+                print(f"💰 TAKE PROFIT {symbol}")
+                self.capital += pos["capital"]
+                eliminar.append(symbol)
+
+        for symbol in eliminar:
+            del self.posiciones[symbol]
+
+    # ============================
+    # 📊 ESTADO
+    # ============================
+    def resumen(self):
+        print(f"💰 Capital: {self.capital}")
+        print(f"📊 Posiciones: {list(self.posiciones.keys())}")
