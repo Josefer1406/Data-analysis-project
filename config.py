@@ -28,3 +28,9 @@ MAX_PESO_BUENO = 0.20
 MAX_PESO_NORMAL = 0.15
 
 MIN_PROBABILIDAD = 0.60
+
+# 🔴 STOP LOSS INSTITUCIONAL (necesario para portfolio.py)
+STOP_LOSS = 0.03   # 3% pérdida máxima
+
+# 🔵 TAKE PROFIT BASE (temporal mientras metemos trailing)
+TAKE_PROFIT = 0.06  # 6% base
