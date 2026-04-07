@@ -1,48 +1,57 @@
-from data.exchange import obtener_datos
-from ta.trend import EMAIndicator
-from ta.momentum import RSIIndicator
-from ml.predictor import predecir
+import ccxt
+import pandas as pd
+import config
+
+exchange = ccxt.okx()
+
+def obtener_datos(symbol):
+
+    ohlcv = exchange.fetch_ohlcv(symbol, timeframe=config.TIMEFRAME, limit=100)
+
+    df = pd.DataFrame(ohlcv, columns=["time","open","high","low","close","volume"])
+
+    return df
+
 
 def analizar(symbol):
 
     df = obtener_datos(symbol)
 
-    df["ema20"] = EMAIndicator(df["close"], 20).ema_indicator()
-    df["ema50"] = EMAIndicator(df["close"], 50).ema_indicator()
-    df["rsi"] = RSIIndicator(df["close"], 14).rsi()
+    if df is None or len(df) < 50:
+        return 0, 0, "HOLD", 0
 
-    df["volumen"] = df["volume"]
-    df["volatilidad"] = df["close"].pct_change().rolling(10).std()
+    # =========================
+    # INDICADORES
+    # =========================
+    df["ema20"] = df["close"].ewm(span=20).mean()
+    df["ema50"] = df["close"].ewm(span=50).mean()
 
-    df = df.dropna()
+    df["returns"] = df["close"].pct_change()
 
-    if df.empty:
-        raise Exception("No data")
-
-    last = df.iloc[-1]
-
-    features = {
-        "ema20": last["ema20"],
-        "ema50": last["ema50"],
-        "rsi": last["rsi"],
-        "volumen": last["volumen"],
-        "volatilidad": last["volatilidad"]
-    }
-
-    prob = predecir(features)
+    precio = df["close"].iloc[-1]
 
     score = 0
 
-    if last["ema20"] > last["ema50"]:
+    # =========================
+    # SEÑALES
+    # =========================
+    if df["ema20"].iloc[-1] > df["ema50"].iloc[-1]:
         score += 1
 
-    if 40 < last["rsi"] < 60:
+    if df["returns"].iloc[-1] > 0:
         score += 1
 
-    if prob > 0.6:
-        score += 2
+    if df["close"].iloc[-1] > df["ema20"].iloc[-1]:
+        score += 1
 
-    decision = "BUY" if score >= 3 else "HOLD"
+    # =========================
+    # PROBABILIDAD REAL
+    # =========================
+    prob = score / 3  # 0 → 1
 
-    # 🔥 SOLO 4 VALORES (CLAVE)
-    return score, last["close"], decision, prob
+    if score >= 2:
+        decision = "BUY"
+    else:
+        decision = "HOLD"
+
+    return score, precio, decision, prob
