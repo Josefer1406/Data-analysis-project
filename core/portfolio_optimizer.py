@@ -6,16 +6,17 @@ def optimizar_portafolio(candidatos, capital_total, max_posiciones):
     if capital_total < config.MIN_CAPITAL_OPERAR:
         return {}
 
-    # ordenar por probabilidad REAL
     candidatos = sorted(candidatos, key=lambda x: x[2], reverse=True)
     candidatos = candidatos[:max_posiciones]
 
     probs = np.array([c[2] for c in candidatos])
+
+    # 🔥 penalizar probabilidades medias
+    probs = np.power(probs, 2)
+
     probs = np.clip(probs, 0.01, 1)
 
-    # 🔥 SOFTMAX (nivel institucional)
-    exp_probs = np.exp(probs)
-    pesos = exp_probs / exp_probs.sum()
+    pesos = probs / probs.sum()
 
     allocation = {}
 
@@ -23,12 +24,13 @@ def optimizar_portafolio(candidatos, capital_total, max_posiciones):
 
         capital_asignado = float(capital_total * pesos[i])
 
-        # 🔥 límite por activo (anti sobreexposición)
-        max_capital_asset = capital_total * 0.4
+        # 🔥 límite institucional (MUY IMPORTANTE)
+        max_capital_asset = capital_total * 0.3
 
         capital_asignado = min(capital_asignado, max_capital_asset)
 
-        if capital_asignado < 20:
+        # 🔥 mínimo realista
+        if capital_asignado < 30:
             continue
 
         allocation[symbol] = {
