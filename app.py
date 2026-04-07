@@ -13,9 +13,6 @@ from database import crear_tablas, insertar_trade, obtener_trades, reset_databas
 
 app = Flask(__name__)
 
-# =========================
-# API
-# =========================
 @app.route("/")
 def home():
     return "🚀 QUANT BOT INSTITUCIONAL ACTIVO"
@@ -36,9 +33,6 @@ def data():
         } for r in rows
     ])
 
-# =========================
-# BOT
-# =========================
 def run_bot():
 
     print("🚀 BOT INICIADO")
@@ -46,9 +40,8 @@ def run_bot():
     portfolio.cargar_estado()
     crear_tablas()
 
-    # 🔥 RESET SOLO UNA VEZ
-    if os.getenv("RESET_DB") == "1":
-        reset_database()
+    # 🔥 RESET FORZADO (SOLO UNA VEZ)
+    reset_database()
 
     while True:
         try:
@@ -83,9 +76,7 @@ def run_bot():
             for t in top:
                 print(t)
 
-            # =========================
             # CIERRES
-            # =========================
             for symbol in list(portfolio.posiciones.keys()):
 
                 precio_actual = next(
@@ -110,9 +101,7 @@ def run_bot():
 
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
-            # =========================
             # APERTURAS
-            # =========================
             for symbol, score, precio, decision, prob in top:
 
                 if score >= 1:
@@ -143,11 +132,7 @@ def run_bot():
             print(f"❌ ERROR: {e}")
             time.sleep(10)
 
-# =========================
-# MAIN
-# =========================
 if __name__ == "__main__":
-
     threading.Thread(target=run_bot, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
