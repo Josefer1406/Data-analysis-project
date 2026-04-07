@@ -1,68 +1,65 @@
 import config
-import json
-import os
 
-# =========================
-# ARCHIVO DE ESTADO
-# =========================
-STATE_FILE = "portfolio_state.json"
-
-# =========================
-# VARIABLES
-# =========================
 capital = float(config.CAPITAL_INICIAL)
 posiciones = {}
 
-STOP_LOSS = -0.02
-TAKE_PROFIT = 0.05
-
-
-# =========================
-# GUARDAR ESTADO
-# =========================
-def guardar_estado():
-    data = {
-        "capital": capital,
-        "posiciones": posiciones
-    }
-
-    with open(STATE_FILE, "w") as f:
-        json.dump(data, f)
-
+STOP_LOSS = config.STOP_LOSS
+TAKE_PROFIT = config.TAKE_PROFIT
 
 # =========================
-# CARGAR ESTADO
-# =========================
-def cargar_estado():
-    global capital, posiciones
-
-    if os.path.exists(STATE_FILE):
-        try:
-            with open(STATE_FILE, "r") as f:
-                data = json.load(f)
-                capital = data.get("capital", capital)
-                posiciones = data.get("posiciones", {})
-                print("✅ Estado cargado correctamente")
-        except Exception as e:
-            print("⚠️ Error cargando estado:", e)
-    else:
-        print("🆕 Iniciando nuevo portfolio")
-
-
-# =========================
-# ABRIR POSICIÓN
+# ABRIR POSICIÓN (PRO)
 # =========================
 def abrir_posicion(symbol, precio, size):
     global capital
 
-    if symbol in posiciones:
-        return False
-
-    if len(posiciones) >= config.MAX_POSICIONES:
-        return False
-
     costo = precio * size
 
+    # =========================
+    # SI YA EXISTE → REENTRADA
+    # =========================
+    if symbol in posiciones:
+
+        pos = posiciones[symbol]
+
+        # promedio de precio (position scaling)
+        nuevo_size = pos["size"] + size
+        nuevo_precio = (
+            (pos["precio"] * pos["size"]) + (precio * size)
+        ) / nuevo_size
+
+        posiciones[symbol] = {
+            "precio": nuevo_precio,
+            "size": nuevo_size
+        }
+
+        capital -= costo
+        return True
+
+    # =========================
+    # CONTROL DE POSICIONES
+    # =========================
+    if len(posiciones) >= config.MAX_POSICIONES:
+
+        # 🔥 ROTACIÓN: eliminar peor posición
+        peor_symbol = None
+        peor_pnl = 0
+
+        for s, p in posiciones.items():
+            pnl = (precio - p["precio"]) / p["precio"]
+
+            if pnl < peor_pnl:
+                peor_pnl = pnl
+                peor_symbol = s
+
+        if peor_symbol:
+            cerrar_posicion(peor_symbol, precio)
+
+        else:
+            return False
+
+    # =========================
+    # VALIDAR CAPITAL
+    # =========================
     if costo > capital:
         return False
 
@@ -72,8 +69,6 @@ def abrir_posicion(symbol, precio, size):
         "precio": precio,
         "size": size
     }
-
-    guardar_estado()  # 🔥 CLAVE
 
     return True
 
@@ -92,13 +87,11 @@ def cerrar_posicion(symbol, precio):
 
     del posiciones[symbol]
 
-    guardar_estado()  # 🔥 CLAVE
-
     return pnl
 
 
 # =========================
-# EVALUAR SALIDA
+# SALIDA
 # =========================
 def evaluar_salida(symbol, precio):
     pos = posiciones[symbol]
@@ -106,3 +99,11 @@ def evaluar_salida(symbol, precio):
     pnl = (precio - pos["precio"]) / pos["precio"]
 
     return pnl <= STOP_LOSS or pnl >= TAKE_PROFIT
+
+
+# =========================
+# ESTADO
+# =========================
+def cargar_estado():
+    global capital
+    print("🆕 Iniciando nuevo portfolio")
