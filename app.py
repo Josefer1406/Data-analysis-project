@@ -36,6 +36,12 @@ def data():
         } for r in rows
     ])
 
+# 🔥 NUEVO: RESET MANUAL
+@app.route("/reset")
+def reset():
+    reset_database()
+    return "🧹 DATABASE RESETEADA"
+
 # =========================
 # BOT ENGINE
 # =========================
@@ -46,13 +52,6 @@ def run_bot():
     portfolio.cargar_estado()
     crear_tablas()
 
-    # =========================
-    # RESET CONTROLADO (opcional)
-    # =========================
-    if os.getenv("RESET_DB") == "1":
-        print("🧹 Ejecutando RESET...")
-        reset_database()
-
     while True:
         try:
 
@@ -60,9 +59,6 @@ def run_bot():
 
             candidatos = []
 
-            # =========================
-            # SCANNER
-            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
@@ -83,9 +79,6 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # OPTIMIZACIÓN PORTAFOLIO
-            # =========================
             allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
@@ -123,11 +116,10 @@ def run_bot():
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
             # =========================
-            # APERTURAS (CONTROLADAS)
+            # APERTURAS CONTROLADAS
             # =========================
             for symbol, data_alloc in allocation.items():
 
-                # 🔥 evitar sobrecompra
                 if symbol in portfolio.posiciones:
                     continue
 
@@ -148,11 +140,8 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🟢 BUY {symbol} | peso: {round(data_alloc['peso'],2)}")
+                    print(f"🟢 BUY {symbol}")
 
-            # =========================
-            # ESTADO
-            # =========================
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print("⏳ Ciclo completado...\n")
