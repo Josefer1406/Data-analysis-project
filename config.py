@@ -5,26 +5,26 @@
 CAPITAL_INICIAL = 1000
 
 # Gestión de riesgo
-RIESGO_POR_TRADE = 0.02  # 2%
+RIESGO_POR_TRADE = 0.02
 MAX_POSICIONES = 5
-MAX_EXPOSICION_TOTAL = 0.7  # 70% del capital máximo invertido
+MAX_EXPOSICION_TOTAL = 0.7
 
-# Asignación dinámica
+# Asignación
 MAX_PESO_POR_ACTIVO = 0.30
 MIN_PESO_POR_ACTIVO = 0.10
 
-# Umbrales de decisión
+# Umbrales
 UMBRAL_COMPRA = 0.65
 UMBRAL_COMPRA_FUERTE = 0.85
 
-# Stop / TP
+# Risk management
 STOP_LOSS = -0.03
 TAKE_PROFIT = 0.05
 
 # Filtro institucional
-MIN_SCORE = 2  # mínimo factores cumplidos
-COOLDOWN = 3  # ciclos sin reentrada
+MIN_SCORE = 2
+COOLDOWN = 3
 
-# Capital mínimo
+# Capital
 MIN_CAPITAL_OPERAR = 50
-RESERVA_CAPITAL = 0.30  # 30% siempre en cash
+RESERVA_CAPITAL = 0.30
