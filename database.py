@@ -1,69 +1,77 @@
 import psycopg2
 import os
-from urllib.parse import urlparse
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def conectar():
-    result = urlparse(DATABASE_URL)
+    return psycopg2.connect(DATABASE_URL)
 
-    return psycopg2.connect(
-        database=result.path[1:],
-        user=result.username,
-        password=result.password,
-        host=result.hostname,
-        port=result.port
-    )
-
+# =========================
+# CREAR TABLA
+# =========================
 def crear_tablas():
     conn = conectar()
     cur = conn.cursor()
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS trades (
-        id SERIAL PRIMARY KEY,
-        fecha TIMESTAMP,
-        symbol TEXT,
-        tipo TEXT,
-        precio FLOAT,
-        size FLOAT,
-        pnl FLOAT,
-        capital FLOAT
-    );
+        CREATE TABLE IF NOT EXISTS trades (
+            id SERIAL PRIMARY KEY,
+            fecha TIMESTAMP,
+            symbol TEXT,
+            tipo TEXT,
+            precio FLOAT,
+            size FLOAT,
+            pnl FLOAT,
+            capital FLOAT
+        );
     """)
 
     conn.commit()
     cur.close()
     conn.close()
 
+# =========================
+# INSERTAR
+# =========================
 def insertar_trade(fecha, symbol, tipo, precio, size, pnl, capital):
-
-    # 🔥 CONVERSIÓN CRÍTICA (SOLUCIÓN)
-    precio = float(precio)
-    size = float(size)
-    pnl = float(pnl)
-    capital = float(capital)
-
     conn = conectar()
     cur = conn.cursor()
 
     cur.execute("""
         INSERT INTO trades (fecha, symbol, tipo, precio, size, pnl, capital)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
     """, (fecha, symbol, tipo, precio, size, pnl, capital))
 
     conn.commit()
     cur.close()
     conn.close()
 
+# =========================
+# OBTENER
+# =========================
 def obtener_trades():
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM trades ORDER BY fecha ASC;")
+    cur.execute("SELECT * FROM trades ORDER BY fecha ASC")
     rows = cur.fetchall()
 
     cur.close()
     conn.close()
 
     return rows
+
+# =========================
+# RESET TOTAL 🔥
+# =========================
+def reset_database():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM trades;")
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    print("🧹 Base de datos reiniciada")
