@@ -3,7 +3,6 @@ import config
 
 def optimizar_portafolio(candidatos, capital_total, max_posiciones):
 
-    # 🔥 PROTECCIÓN
     if capital_total < config.MIN_CAPITAL_OPERAR:
         return {}
 
@@ -19,16 +18,16 @@ def optimizar_portafolio(candidatos, capital_total, max_posiciones):
 
     for i, (symbol, score, prob, precio) in enumerate(candidatos):
 
-        capital_asignado = capital_total * pesos[i]
+        capital_asignado = float(capital_total * pesos[i])  # 🔥 FIX
+        precio = float(precio)
 
-        # 🔥 evitar tamaños ridículos
         if capital_asignado < 10:
             continue
 
         allocation[symbol] = {
             "capital": capital_asignado,
             "precio": precio,
-            "peso": pesos[i]
+            "peso": float(pesos[i])  # 🔥 FIX
         }
 
     return allocation
