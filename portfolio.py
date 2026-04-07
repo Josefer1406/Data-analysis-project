@@ -14,7 +14,6 @@ def capital_disponible():
 def abrir_posicion(symbol, precio, size):
     global capital
 
-    # 🔥 BLOQUEO CRÍTICO
     if symbol in posiciones:
         return False
 
@@ -80,3 +79,13 @@ def cargar_estado():
         capital = config.CAPITAL_INICIAL
 
     print(f"💰 Capital inicial: {capital}")
+
+
+# 🔥 NUEVO RESET TOTAL
+def reset_portfolio():
+    global capital, posiciones
+
+    capital = float(config.CAPITAL_INICIAL)
+    posiciones = {}
+
+    print("🔄 Portfolio reiniciado a 1000 USDT")
