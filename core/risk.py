@@ -6,35 +6,36 @@ def calcular_size(precio, score, prob):
     capital = portfolio.capital
 
     # =========================
-    # BASE
+    # PESO POR PROBABILIDAD
     # =========================
-    riesgo_base = config.RIESGO_POR_TRADE
+    # normalizar entre 0 y 1
+    prob = max(0.4, min(prob, 0.9))
 
-    # =========================
-    # CONVICCIÓN (🔥 CLAVE)
-    # =========================
-    factor = 1
-
-    # ALTA CONFIANZA
-    if score >= 2 and prob > 0.6:
-        factor = 2   # 🔥 doble inversión
-
-    # MEDIA
-    elif score >= 1 and prob > 0.55:
-        factor = 1
-
-    # BAJA
-    else:
-        factor = 0.5  # menos inversión
+    peso_prob = (prob - 0.4) / (0.9 - 0.4)
 
     # =========================
-    # RIESGO FINAL
+    # PESO POR SCORE
     # =========================
-    riesgo = riesgo_base * factor
+    peso_score = score / 3  # max score esperado = 3
 
-    # límite de seguridad
+    # =========================
+    # CONVICCIÓN FINAL
+    # =========================
+    conviccion = (peso_prob * 0.7) + (peso_score * 0.3)
+
+    # =========================
+    # RIESGO DINÁMICO
+    # =========================
+    riesgo = config.RIESGO_POR_TRADE * (0.5 + conviccion)
+
+    # límite institucional
     riesgo = min(riesgo, config.MAX_RIESGO)
 
-    size = (capital * riesgo) / precio
+    # =========================
+    # SIZE FINAL
+    # =========================
+    capital_asignado = capital * riesgo
+
+    size = capital_asignado / precio
 
     return size
