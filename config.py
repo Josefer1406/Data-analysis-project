@@ -1,5 +1,11 @@
+# =========================
+# CAPITAL
+# =========================
 CAPITAL_INICIAL = 1000
 
+# =========================
+# MERCADO
+# =========================
 CRYPTOS = [
     "BTC/USDT",
     "ETH/USDT",
@@ -13,13 +19,27 @@ CRYPTOS = [
     "ATOM/USDT"
 ]
 
+# 🔥 CLAVE (ESTO FALTABA)
+TIMEFRAME = "1h"
+
+# =========================
+# PORTAFOLIO
+# =========================
 MAX_POSICIONES = 3
 
+# =========================
+# TIEMPO
+# =========================
 CYCLE_TIME = 60
 
+# =========================
+# RIESGO
+# =========================
 STOP_LOSS = -0.02
 TAKE_PROFIT = 0.04
 
-# 🔥 NUEVO
+# =========================
+# CONTROL CAPITAL
+# =========================
 MIN_CAPITAL_OPERAR = 50
-RESERVA_CAPITAL = 0.2  # 20% no se usa
+RESERVA_CAPITAL = 0.2
