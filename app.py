@@ -18,7 +18,7 @@ app = Flask(__name__)
 # =========================
 @app.route("/")
 def home():
-    return "🚀 QUANT ENGINE INSTITUCIONAL ACTIVO"
+    return "🚀 QUANT ENGINE - ENTRENAMIENTO ESTABLE"
 
 @app.route("/data")
 def data():
@@ -29,10 +29,10 @@ def data():
             "fecha": r[1],
             "symbol": r[2],
             "tipo": r[3],
-            "precio": r[4],
-            "size": r[5],
-            "pnl": r[6],
-            "capital": r[7]
+            "precio": float(r[4]),
+            "size": float(r[5]),
+            "pnl": float(r[6]),
+            "capital": float(r[7])
         } for r in rows
     ])
 
@@ -41,7 +41,7 @@ def data():
 # =========================
 def run_bot():
 
-    print("🚀 ENGINE INSTITUCIONAL INICIADO")
+    print("🚀 ENGINE INSTITUCIONAL (FASE ENTRENAMIENTO)")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -54,11 +54,15 @@ def run_bot():
             ranking = []
 
             # =========================
-            # SCANNER GLOBAL
+            # SCANNER
             # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
+
+                    # 🔥 convertir numpy → python
+                    precio = float(precio)
+                    prob = float(prob)
 
                     print(f"{symbol} | score: {score} | prob: {round(prob,2)}")
 
@@ -68,12 +72,12 @@ def run_bot():
                     print(f"❌ Error {symbol}: {e}")
 
             if not ranking:
-                print("⚠️ Sin datos del mercado")
+                print("⚠️ Sin datos")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
             # =========================
-            # ORDENAMIENTO INSTITUCIONAL
+            # ORDENAMIENTO
             # =========================
             ranking.sort(key=lambda x: (x[1], x[4]), reverse=True)
 
@@ -102,20 +106,20 @@ def run_bot():
                         datetime.datetime.now(),
                         symbol,
                         "SELL",
-                        precio_actual,
-                        size,
-                        pnl,
-                        portfolio.capital
+                        float(precio_actual),
+                        float(size),
+                        float(pnl),
+                        float(portfolio.capital)
                     )
 
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
             # =========================
-            # APERTURAS (BASE INSTITUCIONAL)
+            # APERTURAS (🔥 CLAVE)
             # =========================
             for symbol, score, precio, decision, prob in top:
 
-                # 🔥 REGLA BASE (NO BLOQUEANTE)
+                # 🔥 ignoramos decision ML en entrenamiento
                 if score >= 1:
 
                     size = calcular_size(precio)
@@ -126,17 +130,17 @@ def run_bot():
                             datetime.datetime.now(),
                             symbol,
                             "BUY",
-                            precio,
-                            size,
-                            0,
-                            portfolio.capital
+                            float(precio),
+                            float(size),
+                            0.0,
+                            float(portfolio.capital)
                         )
 
-                        print(f"🟢 BUY {symbol} | score: {score} | prob: {round(prob,2)}")
+                        print(f"🟢 BUY {symbol} | score: {score}")
 
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print("⏳ Ciclo completado...\n")
+            print("⏳ Entrenando...\n")
 
             time.sleep(config.CYCLE_TIME)
 
