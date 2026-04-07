@@ -1,26 +1,39 @@
 import portfolio
 import config
-from filters.market_filter import mercado_favorable
 
-def calcular_size(precio):
+def calcular_size(precio, score, prob):
 
     capital = portfolio.capital
 
     # =========================
-    # RIESGO BASE
+    # BASE
     # =========================
-    riesgo = config.RIESGO_POR_TRADE
+    riesgo_base = config.RIESGO_POR_TRADE
 
     # =========================
-    # MERCADO FUERTE → MÁS AGRESIVO
+    # CONVICCIÓN (🔥 CLAVE)
     # =========================
-    if mercado_favorable():
-        riesgo *= 2   # 🔥 DUPLICA inversión
+    factor = 1
+
+    # ALTA CONFIANZA
+    if score >= 2 and prob > 0.6:
+        factor = 2   # 🔥 doble inversión
+
+    # MEDIA
+    elif score >= 1 and prob > 0.55:
+        factor = 1
+
+    # BAJA
+    else:
+        factor = 0.5  # menos inversión
 
     # =========================
-    # LÍMITE DE SEGURIDAD
+    # RIESGO FINAL
     # =========================
-    riesgo = min(riesgo, 0.1)  # máximo 10% del capital
+    riesgo = riesgo_base * factor
+
+    # límite de seguridad
+    riesgo = min(riesgo, config.MAX_RIESGO)
 
     size = (capital * riesgo) / precio
 

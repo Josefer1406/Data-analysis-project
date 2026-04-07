@@ -122,7 +122,7 @@ def run_bot():
                 # 🔥 ignoramos decision ML en entrenamiento
                 if score >= 1:
 
-                    size = calcular_size(precio)
+                    size = calcular_size(precio, score, prob)
 
                     if portfolio.abrir_posicion(symbol, precio, size):
 
