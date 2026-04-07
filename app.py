@@ -6,31 +6,34 @@ import random
 app = Flask(__name__)
 
 # =========================
-# CONFIG INSTITUCIONAL
+# CONFIG INSTITUCIONAL PRO
 # =========================
 CAPITAL_INICIAL = 1000.0
 MAX_POSICIONES = 5
+MAX_TRADES_POR_CICLO = 2
+
 MIN_HOLD_CICLOS = 3
 COOLDOWN_CICLOS = 2
 
-# position sizing institucional
+# filtros de calidad
+MIN_PROBABILIDAD = 0.6
+
+# position sizing
 SIZE_NORMAL = 0.15
 SIZE_BUENA = 0.20
 SIZE_EXCELENTE = 0.30
 
 # =========================
-# ESTADO GLOBAL
+# ESTADO
 # =========================
 capital = CAPITAL_INICIAL
 posiciones = {}
-historial = []
 
-# control institucional
 ultimo_trade = {}
 hold_ciclos = {}
 
 # =========================
-# PRICE ENGINE (REALISTA)
+# PRICE ENGINE
 # =========================
 precios = {
     "BTC/USDT": 70000,
@@ -66,10 +69,9 @@ def analizar_mercado():
 
         print(f"{symbol} | score: {score} | prob: {prob}")
 
-        if score >= 1:
+        if prob >= MIN_PROBABILIDAD:
             señales.append({
                 "symbol": symbol,
-                "score": score,
                 "prob": prob,
                 "precio": precio
             })
@@ -77,12 +79,12 @@ def analizar_mercado():
     return señales
 
 # =========================
-# POSITION SIZING PRO
+# POSITION SIZING
 # =========================
-def calcular_size(conviccion):
-    if conviccion >= 0.8:
+def calcular_size(prob):
+    if prob >= 0.8:
         return SIZE_EXCELENTE
-    elif conviccion >= 0.6:
+    elif prob >= 0.6:
         return SIZE_BUENA
     else:
         return SIZE_NORMAL
@@ -91,32 +93,34 @@ def calcular_size(conviccion):
 # EXECUTION ENGINE PRO
 # =========================
 def ejecutar_operaciones(señales):
-    global capital, posiciones
+    global capital
 
     # ordenar por mejor oportunidad
     señales = sorted(señales, key=lambda x: x["prob"], reverse=True)
 
+    trades_realizados = 0
+
     for s in señales:
+        if trades_realizados >= MAX_TRADES_POR_CICLO:
+            break
+
         symbol = s["symbol"]
         prob = s["prob"]
         precio = s["precio"]
 
-        # evitar sobre exposición
         if len(posiciones) >= MAX_POSICIONES:
             break
 
-        # evitar repetir trade inmediato
-        if symbol in ultimo_trade and ultimo_trade[symbol] < COOLDOWN_CICLOS:
+        if symbol in posiciones:
             continue
 
-        # evitar duplicados
-        if symbol in posiciones:
+        if symbol in ultimo_trade and ultimo_trade[symbol] < COOLDOWN_CICLOS:
             continue
 
         size = calcular_size(prob)
         inversion = capital * size
 
-        if inversion <= 0:
+        if inversion <= 10:
             continue
 
         posiciones[symbol] = {
@@ -129,13 +133,15 @@ def ejecutar_operaciones(señales):
         ultimo_trade[symbol] = 0
         hold_ciclos[symbol] = 0
 
+        trades_realizados += 1
+
         print(f"🟢 BUY {symbol} | convicción: {prob:.2f}")
 
 # =========================
-# RISK ENGINE (VENTAS PRO)
+# RISK ENGINE
 # =========================
 def gestionar_posiciones():
-    global capital, posiciones
+    global capital
 
     eliminar = []
 
@@ -148,17 +154,14 @@ def gestionar_posiciones():
 
         print(f"🔍 {symbol} pnl: {round(pnl,4)}")
 
-        # NO vender antes del holding mínimo
         if pos["ciclos"] < MIN_HOLD_CICLOS:
             continue
 
-        # STOP LOSS
         if pnl < -0.02:
             print(f"🔴 STOP LOSS {symbol}")
             capital += pos["capital"] * (1 + pnl)
             eliminar.append(symbol)
 
-        # TAKE PROFIT dinámico
         elif pnl > 0.03:
             print(f"💰 TAKE PROFIT {symbol}")
             capital += pos["capital"] * (1 + pnl)
@@ -169,7 +172,7 @@ def gestionar_posiciones():
         hold_ciclos.pop(s, None)
 
 # =========================
-# LOOP PRINCIPAL
+# LOOP
 # =========================
 def run_bot():
     global ultimo_trade
@@ -178,14 +181,14 @@ def run_bot():
         print("\n🔎 Analizando mercado...")
 
         señales = analizar_mercado()
+
         gestionar_posiciones()
         ejecutar_operaciones(señales)
 
-        # actualizar cooldowns
         for s in ultimo_trade:
             ultimo_trade[s] += 1
 
-        print(f"💰 Capital: {capital}")
+        print(f"💰 Capital: {round(capital,2)}")
         print(f"📊 Posiciones: {list(posiciones.keys())}")
         print("⏳ Ciclo completado...\n")
 
@@ -203,17 +206,14 @@ def data():
 
 @app.route("/reset")
 def reset():
-    global capital, posiciones, historial, ultimo_trade, hold_ciclos
+    global capital, posiciones, ultimo_trade, hold_ciclos
 
     capital = CAPITAL_INICIAL
     posiciones = {}
-    historial = []
     ultimo_trade = {}
     hold_ciclos = {}
 
-    print("🧹 Base reiniciada")
-    print("🔄 Capital restaurado a 1000")
-
+    print("🧹 RESET OK")
     return jsonify({"status": "reset ok"})
 
 # =========================
