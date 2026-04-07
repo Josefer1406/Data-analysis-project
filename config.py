@@ -1,59 +1,30 @@
-# ================================
-# CONFIGURACIÓN CUANT INSTITUCIONAL PRO
-# ================================
-
-CRYPTOS = [
-    "BTC/USDT",
-    "ETH/USDT",
-    "SOL/USDT",
-    "XRP/USDT",
-    "ADA/USDT",
-    "DOGE/USDT",
-    "AVAX/USDT",
-    "LINK/USDT",
-    "LTC/USDT",
-    "ATOM/USDT"
-]
-
-TIMEFRAME = "5m"
+# =========================
+# CONFIG INSTITUCIONAL PRO
+# =========================
 
 CAPITAL_INICIAL = 1000
 
-CYCLE_TIME = 60
+# Gestión de riesgo
+RIESGO_POR_TRADE = 0.02  # 2%
+MAX_POSICIONES = 5
+MAX_EXPOSICION_TOTAL = 0.7  # 70% del capital máximo invertido
 
-MAX_POSICIONES = 3
+# Asignación dinámica
+MAX_PESO_POR_ACTIVO = 0.30
+MIN_PESO_POR_ACTIVO = 0.10
 
-# ================================
-# 🔥 RISK ENGINE PRO
-# ================================
+# Umbrales de decisión
+UMBRAL_COMPRA = 0.65
+UMBRAL_COMPRA_FUERTE = 0.85
 
-MAX_EXPOSICION_TOTAL = 0.60   # máximo 60% del capital invertido
-RESERVA_CAPITAL = 0.40        # 40% siempre en liquidez
+# Stop / TP
+STOP_LOSS = -0.03
+TAKE_PROFIT = 0.05
 
-MAX_PESO_EXCELENTE = 0.30     # oportunidades top
-MAX_PESO_BUENO = 0.20         # buenas
-MAX_PESO_NORMAL = 0.15        # normales
+# Filtro institucional
+MIN_SCORE = 2  # mínimo factores cumplidos
+COOLDOWN = 3  # ciclos sin reentrada
 
-MIN_PROBABILIDAD = 0.60       # filtro IA
-
-MIN_CAPITAL_OPERAR = 50       # evita operar con capital residual
-
-# ================================
-# 🔴 CONTROL DE RIESGO
-# ================================
-
-STOP_LOSS = 0.03     # 3%
-TAKE_PROFIT = 0.06   # base
-
-# ================================
-# 🧠 FILTROS AVANZADOS
-# ================================
-
-CORRELACION_MAXIMA = 0.85
-
-# ================================
-# 📊 EJECUCIÓN
-# ================================
-
-SLIPPAGE = 0.001
-COMISION = 0.001
+# Capital mínimo
+MIN_CAPITAL_OPERAR = 50
+RESERVA_CAPITAL = 0.30  # 30% siempre en cash
