@@ -9,16 +9,16 @@ import portfolio
 
 from services.scanner import analizar
 from core.risk import calcular_size
+from core.portfolio_manager import asignar_capital
+from core.correlation_filter import filtrar_correlacion
+
 from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
 
-# =========================
-# API
-# =========================
 @app.route("/")
 def home():
-    return "🚀 QUANT ENGINE INSTITUCIONAL PRO"
+    return "🚀 QUANT FUND ENGINE"
 
 @app.route("/data")
 def data():
@@ -36,12 +36,9 @@ def data():
         } for r in rows
     ])
 
-# =========================
-# BOT ENGINE
-# =========================
 def run_bot():
 
-    print("🚀 ENGINE CUANT PRO INICIADO")
+    print("🚀 ENGINE NIVEL FONDO CUANT")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -51,11 +48,9 @@ def run_bot():
 
             print("\n🔎 Analizando mercado...")
 
-            ranking = []
+            candidatos = []
+            precios_dict = {}
 
-            # =========================
-            # SCANNER
-            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
@@ -65,26 +60,37 @@ def run_bot():
 
                     print(f"{symbol} | score: {score} | prob: {round(prob,2)}")
 
-                    ranking.append((symbol, score, precio, decision, prob))
+                    precios_dict[symbol] = [precio]
+
+                    if score >= 1:
+                        candidatos.append((symbol, score, prob, precio))
 
                 except Exception as e:
                     print(f"❌ Error {symbol}: {e}")
 
-            if not ranking:
-                print("⚠️ Sin datos")
+            if not candidatos:
+                print("⚠️ Sin oportunidades")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
             # =========================
-            # ORDENAMIENTO
+            # FILTRO DE CORRELACIÓN
             # =========================
-            ranking.sort(key=lambda x: (x[4], x[1]), reverse=True)
+            seleccion = filtrar_correlacion(precios_dict)
 
-            top = ranking[:config.MAX_POSICIONES]
+            candidatos = [c for c in candidatos if c[0] in seleccion]
 
-            print("\n🏆 TOP OPORTUNIDADES:")
-            for t in top:
-                print(t)
+            # =========================
+            # ALLOCATION
+            # =========================
+            allocation = asignar_capital(
+                candidatos,
+                portfolio.capital,
+                config.MAX_POSICIONES
+            )
+
+            print("\n🏆 PORTFOLIO ALLOCATION:")
+            print(allocation)
 
             # =========================
             # CIERRES
@@ -92,7 +98,7 @@ def run_bot():
             for symbol in list(portfolio.posiciones.keys()):
 
                 precio_actual = next(
-                    (p for s, sc, p, d, pr in ranking if s == symbol),
+                    (c[3] for c in candidatos if c[0] == symbol),
                     None
                 )
 
@@ -111,30 +117,31 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
+                    print(f"🔴 SELL {symbol}")
 
             # =========================
-            # APERTURAS (INSTITUCIONAL)
+            # APERTURAS
             # =========================
-            for symbol, score, precio, decision, prob in top:
+            for symbol, data_alloc in allocation.items():
 
-                if score >= 1:
+                precio = data_alloc["precio"]
+                capital_asignado = data_alloc["capital"]
 
-                    size = calcular_size(precio, score, prob)
+                size = capital_asignado / precio
 
-                    if portfolio.abrir_posicion(symbol, precio, size):
+                if portfolio.abrir_posicion(symbol, precio, size):
 
-                        insertar_trade(
-                            datetime.datetime.now(),
-                            symbol,
-                            "BUY",
-                            float(precio),
-                            float(size),
-                            0.0,
-                            float(portfolio.capital)
-                        )
+                    insertar_trade(
+                        datetime.datetime.now(),
+                        symbol,
+                        "BUY",
+                        float(precio),
+                        float(size),
+                        0.0,
+                        float(portfolio.capital)
+                    )
 
-                        print(f"🟢 BUY {symbol} | size dinámico")
+                    print(f"🟢 BUY {symbol} (allocation)")
 
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
@@ -143,14 +150,10 @@ def run_bot():
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR CRÍTICO: {e}")
+            print(f"❌ ERROR: {e}")
             time.sleep(10)
 
-# =========================
-# MAIN
-# =========================
 if __name__ == "__main__":
-
     threading.Thread(target=run_bot, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
