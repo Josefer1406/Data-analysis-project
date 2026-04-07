@@ -9,13 +9,16 @@ import portfolio
 
 from services.scanner import analizar
 from core.risk import calcular_size
-from database import crear_tablas, insertar_trade, obtener_trades, reset_database
+from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
 
+# =========================
+# API
+# =========================
 @app.route("/")
 def home():
-    return "🚀 QUANT BOT INSTITUCIONAL ACTIVO"
+    return "🚀 QUANT ENGINE INSTITUCIONAL PRO"
 
 @app.route("/data")
 def data():
@@ -33,15 +36,15 @@ def data():
         } for r in rows
     ])
 
+# =========================
+# BOT ENGINE
+# =========================
 def run_bot():
 
-    print("🚀 BOT INICIADO")
+    print("🚀 ENGINE CUANT PRO INICIADO")
 
     portfolio.cargar_estado()
     crear_tablas()
-
-    # 🔥 RESET FORZADO (SOLO UNA VEZ)
-    reset_database()
 
     while True:
         try:
@@ -50,6 +53,9 @@ def run_bot():
 
             ranking = []
 
+            # =========================
+            # SCANNER
+            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
@@ -69,14 +75,20 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            ranking.sort(key=lambda x: (x[1], x[4]), reverse=True)
+            # =========================
+            # ORDENAMIENTO
+            # =========================
+            ranking.sort(key=lambda x: (x[4], x[1]), reverse=True)
+
             top = ranking[:config.MAX_POSICIONES]
 
             print("\n🏆 TOP OPORTUNIDADES:")
             for t in top:
                 print(t)
 
+            # =========================
             # CIERRES
+            # =========================
             for symbol in list(portfolio.posiciones.keys()):
 
                 precio_actual = next(
@@ -101,7 +113,9 @@ def run_bot():
 
                     print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
-            # APERTURAS
+            # =========================
+            # APERTURAS (INSTITUCIONAL)
+            # =========================
             for symbol, score, precio, decision, prob in top:
 
                 if score >= 1:
@@ -120,7 +134,7 @@ def run_bot():
                             float(portfolio.capital)
                         )
 
-                        print(f"🟢 BUY {symbol} | score: {score}")
+                        print(f"🟢 BUY {symbol} | size dinámico")
 
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
@@ -129,10 +143,14 @@ def run_bot():
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR: {e}")
+            print(f"❌ ERROR CRÍTICO: {e}")
             time.sleep(10)
 
+# =========================
+# MAIN
+# =========================
 if __name__ == "__main__":
+
     threading.Thread(target=run_bot, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
