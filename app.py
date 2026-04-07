@@ -93,9 +93,9 @@ def run_bot():
             for symbol in list(portfolio.posiciones.keys()):
 
                 precio_actual = next(
-                    (p for s, sc, p, d, pr in ranking if s == symbol),
-                    None
-                )
+    (p for s, sc, p, d, pr in ranking if s == symbol),
+    None
+)
 
                 if precio_actual and portfolio.evaluar_salida(symbol, precio_actual):
 
