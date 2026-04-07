@@ -1,11 +1,5 @@
-# =========================
-# CAPITAL
-# =========================
-CAPITAL_INICIAL = 1000
+# CONFIGURACIÓN INSTITUCIONAL PRO
 
-# =========================
-# MERCADO
-# =========================
 CRYPTOS = [
     "BTC/USDT",
     "ETH/USDT",
@@ -19,27 +13,18 @@ CRYPTOS = [
     "ATOM/USDT"
 ]
 
-# 🔥 CLAVE (ESTO FALTABA)
-TIMEFRAME = "1h"
+TIMEFRAME = "5m"
 
-# =========================
-# PORTAFOLIO
-# =========================
 MAX_POSICIONES = 3
 
-# =========================
-# TIEMPO
-# =========================
+CAPITAL_INICIAL = 1000
+
 CYCLE_TIME = 60
 
-# =========================
-# RIESGO
-# =========================
-STOP_LOSS = -0.02
-TAKE_PROFIT = 0.04
+# 🔥 RISK ENGINE
+MAX_EXPOSICION_TOTAL = 0.60
+MAX_PESO_EXCELENTE = 0.30
+MAX_PESO_BUENO = 0.20
+MAX_PESO_NORMAL = 0.15
 
-# =========================
-# CONTROL CAPITAL
-# =========================
-MIN_CAPITAL_OPERAR = 50
-RESERVA_CAPITAL = 0.2
+MIN_PROBABILIDAD = 0.60
