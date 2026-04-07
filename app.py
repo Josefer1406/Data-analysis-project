@@ -8,17 +8,14 @@ import config
 import portfolio
 
 from services.scanner import analizar
-from core.risk import calcular_size
-from core.portfolio_manager import asignar_capital
-from core.correlation_filter import filtrar_correlacion
-
+from core.portfolio_optimizer import optimizar_portafolio
 from database import crear_tablas, insertar_trade, obtener_trades
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "🚀 QUANT FUND ENGINE"
+    return "🚀 QUANT FUND ENGINE FINAL"
 
 @app.route("/data")
 def data():
@@ -38,7 +35,7 @@ def data():
 
 def run_bot():
 
-    print("🚀 ENGINE NIVEL FONDO CUANT")
+    print("🚀 SISTEMA CUANT INSTITUCIONAL FINAL")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -49,7 +46,6 @@ def run_bot():
             print("\n🔎 Analizando mercado...")
 
             candidatos = []
-            precios_dict = {}
 
             for symbol in config.CRYPTOS:
                 try:
@@ -59,8 +55,6 @@ def run_bot():
                     prob = float(prob)
 
                     print(f"{symbol} | score: {score} | prob: {round(prob,2)}")
-
-                    precios_dict[symbol] = [precio]
 
                     if score >= 1:
                         candidatos.append((symbol, score, prob, precio))
@@ -74,22 +68,15 @@ def run_bot():
                 continue
 
             # =========================
-            # FILTRO DE CORRELACIÓN
+            # OPTIMIZACIÓN REAL
             # =========================
-            seleccion = filtrar_correlacion(precios_dict)
-
-            candidatos = [c for c in candidatos if c[0] in seleccion]
-
-            # =========================
-            # ALLOCATION
-            # =========================
-            allocation = asignar_capital(
+            allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
                 config.MAX_POSICIONES
             )
 
-            print("\n🏆 PORTFOLIO ALLOCATION:")
+            print("\n🏆 PORTFOLIO ÓPTIMO:")
             print(allocation)
 
             # =========================
@@ -117,10 +104,10 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🔴 SELL {symbol}")
+                    print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
 
             # =========================
-            # APERTURAS
+            # APERTURAS ÓPTIMAS
             # =========================
             for symbol, data_alloc in allocation.items():
 
@@ -141,7 +128,7 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🟢 BUY {symbol} (allocation)")
+                    print(f"🟢 BUY {symbol} | peso: {round(data_alloc['peso'],2)}")
 
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
