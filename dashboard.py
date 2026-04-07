@@ -2,8 +2,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.title("📊 QUANT DASHBOARD PRO")
+st.set_page_config(layout="wide")
 
+st.title("📊 QUANT DASHBOARD INSTITUCIONAL")
+
+# 🔗 URL API
 url = "https://data-analysis-project-production.up.railway.app/data"
 
 try:
@@ -12,82 +15,101 @@ try:
     # =========================
     # VALIDACIÓN
     # =========================
-    if df is None or df.empty:
-        st.warning("⚠️ No hay datos aún del bot")
+    if df.empty:
+        st.warning("⚠️ No hay datos aún")
         st.stop()
 
-    columnas_esperadas = ["fecha", "symbol", "tipo", "precio", "size", "pnl", "capital"]
-
-    for col in columnas_esperadas:
-        if col not in df.columns:
-            st.error(f"❌ Falta columna: {col}")
-            st.write("Columnas recibidas:", df.columns)
-            st.stop()
-
     # =========================
-    # PROCESAMIENTO
+    # LIMPIEZA
     # =========================
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df = df.sort_values("fecha")
 
-    capital = df["capital"]
+    df["precio"] = df["precio"].astype(float)
+    df["size"] = df["size"].astype(float)
+    df["pnl"] = df["pnl"].astype(float)
+    df["capital"] = df["capital"].astype(float)
 
-    if len(capital) < 2:
-        st.warning("⚠️ Aún no hay suficientes datos para métricas")
-        st.dataframe(df)
-        st.stop()
+    # =========================
+    # SEPARAR TRADES
+    # =========================
+    buys = df[df["tipo"] == "BUY"]
+    sells = df[df["tipo"] == "SELL"]
 
-    returns = capital.pct_change().dropna()
+    # =========================
+    # CAPITAL CURVE
+    # =========================
+    capital_curve = df["capital"]
 
-    ventas = df[df["tipo"] == "SELL"]
+    capital_actual = capital_curve.iloc[-1]
+    capital_inicial = capital_curve.iloc[0]
 
-    pnl = ventas["pnl"].sum()
+    pnl_total = capital_actual - capital_inicial
 
-    winrate = (
-        len(ventas[ventas["pnl"] > 0]) / len(ventas)
-        if len(ventas) > 0 else 0
-    )
+    # =========================
+    # WIN RATE
+    # =========================
+    if len(sells) > 0:
+        winrate = len(sells[sells["pnl"] > 0]) / len(sells)
+    else:
+        winrate = 0
 
     # =========================
     # DRAWDOWN
     # =========================
-    roll = capital.cummax()
-    dd = (capital - roll) / roll
+    roll_max = capital_curve.cummax()
+    drawdown = (capital_curve - roll_max) / roll_max
 
     # =========================
-    # SHARPE (CORREGIDO)
+    # SHARPE
     # =========================
-    sharpe = (
-        (returns.mean() / returns.std()) * np.sqrt(252)
-        if returns.std() != 0 else 0
-    )
+    returns = capital_curve.pct_change().dropna()
+
+    if len(returns) > 1 and returns.std() != 0:
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
+    else:
+        sharpe = 0
 
     # =========================
-    # MÉTRICAS
+    # METRICAS
     # =========================
-    st.subheader("📈 Métricas")
+    st.subheader("📈 Métricas principales")
 
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("PnL", round(pnl, 2))
-    col2.metric("Win Rate", round(winrate * 100, 2))
-    col3.metric("Drawdown %", round(dd.min() * 100, 2))
-    col4.metric("Sharpe", round(sharpe, 2))
+    col1.metric("Capital Inicial", round(capital_inicial, 2))
+    col2.metric("Capital Actual", round(capital_actual, 2))
+    col3.metric("PnL Total", round(pnl_total, 2))
+    col4.metric("Win Rate %", round(winrate * 100, 2))
+
+    col5, col6 = st.columns(2)
+
+    col5.metric("Drawdown %", round(drawdown.min() * 100, 2))
+    col6.metric("Sharpe", round(sharpe, 2))
 
     # =========================
-    # GRÁFICAS
+    # GRAFICOS
     # =========================
-    st.subheader("💰 Curva de capital")
-    st.line_chart(capital)
+    st.subheader("💰 Curva de Capital")
+    st.line_chart(capital_curve)
 
     st.subheader("📉 Drawdown")
-    st.area_chart(dd)
+    st.area_chart(drawdown)
 
     # =========================
-    # TABLA
+    # TRADES
     # =========================
-    st.subheader("📋 Historial")
-    st.dataframe(df)
+    st.subheader("📋 Historial de Trades")
+
+    st.dataframe(df, use_container_width=True)
+
+    # =========================
+    # DEBUG
+    # =========================
+    with st.expander("🔍 Debug"):
+        st.write("Total trades:", len(df))
+        st.write("BUY:", len(buys))
+        st.write("SELL:", len(sells))
 
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
