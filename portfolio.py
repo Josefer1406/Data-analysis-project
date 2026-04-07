@@ -7,59 +7,21 @@ STOP_LOSS = config.STOP_LOSS
 TAKE_PROFIT = config.TAKE_PROFIT
 
 # =========================
-# ABRIR POSICIÓN (PRO)
+# ABRIR POSICIÓN (CONTROLADO)
 # =========================
 def abrir_posicion(symbol, precio, size):
     global capital
 
+    # ❌ evitar recompras infinitas
+    if symbol in posiciones:
+        return False
+
+    # limitar número de posiciones
+    if len(posiciones) >= config.MAX_POSICIONES:
+        return False
+
     costo = precio * size
 
-    # =========================
-    # SI YA EXISTE → REENTRADA
-    # =========================
-    if symbol in posiciones:
-
-        pos = posiciones[symbol]
-
-        # promedio de precio (position scaling)
-        nuevo_size = pos["size"] + size
-        nuevo_precio = (
-            (pos["precio"] * pos["size"]) + (precio * size)
-        ) / nuevo_size
-
-        posiciones[symbol] = {
-            "precio": nuevo_precio,
-            "size": nuevo_size
-        }
-
-        capital -= costo
-        return True
-
-    # =========================
-    # CONTROL DE POSICIONES
-    # =========================
-    if len(posiciones) >= config.MAX_POSICIONES:
-
-        # 🔥 ROTACIÓN: eliminar peor posición
-        peor_symbol = None
-        peor_pnl = 0
-
-        for s, p in posiciones.items():
-            pnl = (precio - p["precio"]) / p["precio"]
-
-            if pnl < peor_pnl:
-                peor_pnl = pnl
-                peor_symbol = s
-
-        if peor_symbol:
-            cerrar_posicion(peor_symbol, precio)
-
-        else:
-            return False
-
-    # =========================
-    # VALIDAR CAPITAL
-    # =========================
     if costo > capital:
         return False
 
@@ -91,18 +53,34 @@ def cerrar_posicion(symbol, precio):
 
 
 # =========================
-# SALIDA
+# EVALUAR SALIDA (CLAVE)
 # =========================
 def evaluar_salida(symbol, precio):
+
+    if symbol not in posiciones:
+        return False
+
     pos = posiciones[symbol]
+    precio_entrada = pos["precio"]
 
-    pnl = (precio - pos["precio"]) / pos["precio"]
+    pnl = (precio - precio_entrada) / precio_entrada
 
-    return pnl <= STOP_LOSS or pnl >= TAKE_PROFIT
+    # DEBUG
+    print(f"🔍 {symbol} pnl: {round(pnl,4)}")
+
+    if pnl <= STOP_LOSS:
+        print(f"🛑 STOP LOSS {symbol}")
+        return True
+
+    if pnl >= TAKE_PROFIT:
+        print(f"🎯 TAKE PROFIT {symbol}")
+        return True
+
+    return False
 
 
 # =========================
-# ESTADO
+# INICIO
 # =========================
 def cargar_estado():
     global capital
