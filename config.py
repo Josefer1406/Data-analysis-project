@@ -1,4 +1,6 @@
-# CONFIGURACIÓN INSTITUCIONAL PRO
+# ================================
+# CONFIGURACIÓN CUANT INSTITUCIONAL PRO
+# ================================
 
 CRYPTOS = [
     "BTC/USDT",
@@ -15,22 +17,42 @@ CRYPTOS = [
 
 TIMEFRAME = "5m"
 
-MAX_POSICIONES = 3
-
 CAPITAL_INICIAL = 1000
 
 CYCLE_TIME = 60
 
-# 🔥 RISK ENGINE
-MAX_EXPOSICION_TOTAL = 0.60
-MAX_PESO_EXCELENTE = 0.30
-MAX_PESO_BUENO = 0.20
-MAX_PESO_NORMAL = 0.15
+MAX_POSICIONES = 3
 
-MIN_PROBABILIDAD = 0.60
+# ================================
+# 🔥 RISK ENGINE PRO
+# ================================
 
-# 🔴 STOP LOSS INSTITUCIONAL (necesario para portfolio.py)
-STOP_LOSS = 0.03   # 3% pérdida máxima
+MAX_EXPOSICION_TOTAL = 0.60   # nunca usar más del 60% del capital
+MAX_PESO_EXCELENTE = 0.30     # oportunidades top
+MAX_PESO_BUENO = 0.20         # buenas
+MAX_PESO_NORMAL = 0.15        # normales
 
-# 🔵 TAKE PROFIT BASE (temporal mientras metemos trailing)
-TAKE_PROFIT = 0.06  # 6% base
+MIN_PROBABILIDAD = 0.60       # filtro IA
+
+# 🔴 CAPITAL MÍNIMO PARA OPERAR
+MIN_CAPITAL_OPERAR = 50       # evita operar con capital residual
+
+# ================================
+# 🔴 CONTROL DE RIESGO
+# ================================
+
+STOP_LOSS = 0.03     # 3% pérdida máxima
+TAKE_PROFIT = 0.06   # base (luego lo mejoramos con trailing)
+
+# ================================
+# 🧠 FILTROS AVANZADOS
+# ================================
+
+CORRELACION_MAXIMA = 0.85     # evita activos muy correlacionados
+
+# ================================
+# 📊 EJECUCIÓN
+# ================================
+
+SLIPPAGE = 0.001
+COMISION = 0.001
