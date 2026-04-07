@@ -9,16 +9,14 @@ import portfolio
 
 from services.scanner import analizar
 from core.portfolio_optimizer import optimizar_portafolio
+from core.correlation_filter import filtrar_correlacion
 from database import crear_tablas, insertar_trade, obtener_trades, reset_database
 
 app = Flask(__name__)
 
-# =========================
-# API
-# =========================
 @app.route("/")
 def home():
-    return "🚀 QUANT FUND ENGINE FINAL ESTABLE"
+    return "🚀 QUANT FUND ENGINE PRO"
 
 @app.route("/data")
 def data():
@@ -36,21 +34,15 @@ def data():
         } for r in rows
     ])
 
-# =========================
-# 🔥 RESET TOTAL
-# =========================
 @app.route("/reset")
 def reset():
     reset_database()
     portfolio.reset_portfolio()
-    return "🧹 RESET TOTAL: DB + CAPITAL + POSICIONES"
+    return "RESET TOTAL"
 
-# =========================
-# BOT ENGINE
-# =========================
 def run_bot():
 
-    print("🚀 SISTEMA CUANT INSTITUCIONAL ESTABLE")
+    print("🚀 QUANT BOT INSTITUCIONAL REAL")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -61,20 +53,17 @@ def run_bot():
             print("\n🔎 Analizando mercado...")
 
             candidatos = []
+            precios_dict = {}
 
-            # =========================
-            # SCANNER
-            # =========================
             for symbol in config.CRYPTOS:
                 try:
                     score, precio, decision, prob = analizar(symbol)
 
-                    precio = float(precio)
-                    prob = float(prob)
-
                     print(f"{symbol} | score: {score} | prob: {round(prob,2)}")
 
-                    if score >= 1:
+                    precios_dict[symbol] = [precio]
+
+                    if decision == "BUY":
                         candidatos.append((symbol, score, prob, precio))
 
                 except Exception as e:
@@ -85,16 +74,18 @@ def run_bot():
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # OPTIMIZACIÓN PORTAFOLIO
-            # =========================
+            # 🔥 FILTRO CORRELACIÓN
+            seleccionados = filtrar_correlacion(precios_dict)
+            candidatos = [c for c in candidatos if c[0] in seleccionados]
+
+            # 🔥 OPTIMIZACIÓN
             allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
                 config.MAX_POSICIONES
             )
 
-            print("\n🏆 PORTAFOLIO ÓPTIMO:")
+            print("\n🏆 PORTAFOLIO FINAL:")
             print(allocation)
 
             # =========================
@@ -122,14 +113,13 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🔴 SELL {symbol} | PnL: {round(pnl,2)}")
+                    print(f"🔴 SELL {symbol}")
 
             # =========================
-            # APERTURAS CONTROLADAS
+            # APERTURAS INTELIGENTES
             # =========================
             for symbol, data_alloc in allocation.items():
 
-                # 🔥 evitar sobrecompra
                 if symbol in portfolio.posiciones:
                     continue
 
@@ -150,24 +140,17 @@ def run_bot():
                         float(portfolio.capital)
                     )
 
-                    print(f"🟢 BUY {symbol} | peso: {round(data_alloc['peso'],2)}")
+                    print(f"🟢 BUY {symbol} | convicción: {round(data_alloc['conviccion'],2)}")
 
-            # =========================
-            # ESTADO
-            # =========================
             print(f"\n💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print("⏳ Ciclo completado...\n")
 
             time.sleep(config.CYCLE_TIME)
 
         except Exception as e:
-            print(f"❌ ERROR CRÍTICO: {e}")
+            print(f"❌ ERROR: {e}")
             time.sleep(10)
 
-# =========================
-# MAIN
-# =========================
 if __name__ == "__main__":
 
     threading.Thread(target=run_bot, daemon=True).start()
