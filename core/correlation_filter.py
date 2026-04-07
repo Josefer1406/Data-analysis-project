@@ -1,6 +1,6 @@
 import pandas as pd
 
-def filtrar_correlacion(precios_dict, threshold=0.8):
+def filtrar_correlacion(precios_dict, threshold=0.75):
 
     df = pd.DataFrame(precios_dict)
 
@@ -13,14 +13,18 @@ def filtrar_correlacion(precios_dict, threshold=0.8):
 
     for col in corr.columns:
 
-        alta_corr = False
+        if not seleccionados:
+            seleccionados.append(col)
+            continue
+
+        correlacion_alta = False
 
         for sel in seleccionados:
             if corr.loc[col, sel] > threshold:
-                alta_corr = True
+                correlacion_alta = True
                 break
 
-        if not alta_corr:
+        if not correlacion_alta:
             seleccionados.append(col)
 
     return seleccionados
