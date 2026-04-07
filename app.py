@@ -42,7 +42,7 @@ def reset():
 
 def run_bot():
 
-    print("🚀 QUANT BOT INSTITUCIONAL REAL")
+    print("🚀 BOT CUANT PRO REAL")
 
     portfolio.cargar_estado()
     crear_tablas()
@@ -63,22 +63,21 @@ def run_bot():
 
                     precios_dict[symbol] = [precio]
 
-                    if decision == "BUY":
+                    # 🔥 FILTRO DURO (CLAVE)
+                    if prob >= 0.6:
                         candidatos.append((symbol, score, prob, precio))
 
                 except Exception as e:
                     print(f"❌ Error {symbol}: {e}")
 
             if not candidatos:
-                print("⚠️ Sin oportunidades")
+                print("⚠️ Sin oportunidades reales")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # 🔥 FILTRO CORRELACIÓN
             seleccionados = filtrar_correlacion(precios_dict)
             candidatos = [c for c in candidatos if c[0] in seleccionados]
 
-            # 🔥 OPTIMIZACIÓN
             allocation = optimizar_portafolio(
                 candidatos,
                 portfolio.capital,
@@ -88,9 +87,6 @@ def run_bot():
             print("\n🏆 PORTAFOLIO FINAL:")
             print(allocation)
 
-            # =========================
-            # CIERRES
-            # =========================
             for symbol in list(portfolio.posiciones.keys()):
 
                 precio_actual = next(
@@ -115,9 +111,6 @@ def run_bot():
 
                     print(f"🔴 SELL {symbol}")
 
-            # =========================
-            # APERTURAS INTELIGENTES
-            # =========================
             for symbol, data_alloc in allocation.items():
 
                 if symbol in portfolio.posiciones:
@@ -152,7 +145,6 @@ def run_bot():
             time.sleep(10)
 
 if __name__ == "__main__":
-
     threading.Thread(target=run_bot, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
