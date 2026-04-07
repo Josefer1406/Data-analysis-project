@@ -6,23 +6,24 @@ posiciones = {}
 STOP_LOSS = config.STOP_LOSS
 TAKE_PROFIT = config.TAKE_PROFIT
 
-# =========================
-# ABRIR POSICIÓN (CONTROLADO)
-# =========================
+
+def capital_disponible():
+    return capital * (1 - config.RESERVA_CAPITAL)
+
+
 def abrir_posicion(symbol, precio, size):
     global capital
 
-    # ❌ evitar recompras infinitas
     if symbol in posiciones:
         return False
 
-    # limitar número de posiciones
     if len(posiciones) >= config.MAX_POSICIONES:
         return False
 
     costo = precio * size
 
-    if costo > capital:
+    # 🔥 usar capital disponible (no todo)
+    if costo > capital_disponible():
         return False
 
     capital -= costo
@@ -35,9 +36,6 @@ def abrir_posicion(symbol, precio, size):
     return True
 
 
-# =========================
-# CERRAR POSICIÓN
-# =========================
 def cerrar_posicion(symbol, precio):
     global capital
 
@@ -52,20 +50,15 @@ def cerrar_posicion(symbol, precio):
     return pnl
 
 
-# =========================
-# EVALUAR SALIDA (CLAVE)
-# =========================
 def evaluar_salida(symbol, precio):
 
     if symbol not in posiciones:
         return False
 
     pos = posiciones[symbol]
-    precio_entrada = pos["precio"]
 
-    pnl = (precio - precio_entrada) / precio_entrada
+    pnl = (precio - pos["precio"]) / pos["precio"]
 
-    # DEBUG
     print(f"🔍 {symbol} pnl: {round(pnl,4)}")
 
     if pnl <= STOP_LOSS:
@@ -79,9 +72,12 @@ def evaluar_salida(symbol, precio):
     return False
 
 
-# =========================
-# INICIO
-# =========================
 def cargar_estado():
     global capital
-    print("🆕 Iniciando nuevo portfolio")
+
+    # 🔥 protección contra capital roto
+    if capital < config.MIN_CAPITAL_OPERAR:
+        print("⚠️ Capital demasiado bajo, reiniciando")
+        capital = config.CAPITAL_INICIAL
+
+    print(f"💰 Capital inicial: {capital}")
