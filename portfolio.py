@@ -9,28 +9,62 @@ class Portfolio:
         self.posiciones = {}
         self.historial = []
         self.last_trade = 0
+        self.cooldown = config.COOLDOWN_BASE
 
-        print(f"🚀 Capital inicial: {self.capital}")
+        print(f"🚀 Capital inicial: {self.capital_inicial}")
 
     # =========================
-    # EXPOSICIÓN TOTAL
+    # EXPOSICIÓN REAL
     # =========================
     def capital_invertido(self):
-        return sum([p["inversion"] for p in self.posiciones.values()])
+        return sum(p["inversion"] for p in self.posiciones.values())
 
     def exposicion_actual(self):
         return self.capital_invertido() / self.capital_inicial
 
     # =========================
-    # COOLDOWN (base)
+    # COOLDOWN DINÁMICO
     # =========================
+    def actualizar_cooldown(self):
+
+        if len(self.historial) < 5:
+            self.cooldown = 15
+            return
+
+        ultimos = self.historial[-5:]
+        winrate = sum(1 for t in ultimos if t["pnl"] > 0) / len(ultimos)
+
+        if winrate < 0.4:
+            self.cooldown = 60  # mercado malo
+        elif winrate > 0.7:
+            self.cooldown = 10  # mercado bueno
+        else:
+            self.cooldown = 25
+
     def puede_operar(self):
-        return (time.time() - self.last_trade) > config.COOLDOWN_BASE
+        return (time.time() - self.last_trade) > self.cooldown
 
     # =========================
-    # BUY (CONTROL INSTITUCIONAL)
+    # FILTRO ANTICORRELACIÓN
     # =========================
-    def comprar(self, symbol, precio, prob, vol):
+    def correlacionado(self, symbol):
+
+        grupo_nuevo = None
+        for g, lista in config.CORRELACION.items():
+            if symbol in lista:
+                grupo_nuevo = g
+
+        for s in self.posiciones:
+            for g, lista in config.CORRELACION.items():
+                if s in lista and g == grupo_nuevo:
+                    return True
+
+        return False
+
+    # =========================
+    # COMPRA INSTITUCIONAL
+    # =========================
+    def comprar(self, symbol, precio, prob):
 
         if not self.puede_operar():
             return False
@@ -41,8 +75,8 @@ class Portfolio:
         if len(self.posiciones) >= config.MAX_POSICIONES:
             return False
 
-        # 🚨 CONTROL GLOBAL (CLAVE)
-        if self.exposicion_actual() >= config.USO_CAPITAL:
+        if self.correlacionado(symbol):
+            print(f"⛔ Correlación evitada: {symbol}")
             return False
 
         # =========================
@@ -57,15 +91,17 @@ class Portfolio:
 
         capital_trade = self.capital_inicial * size
 
-        # 🚨 evitar sobrepasar 60%
-        if self.capital_invertido() + capital_trade > self.capital_inicial * config.USO_CAPITAL:
+        # =========================
+        # CONTROL DURO GLOBAL
+        # =========================
+        if (self.capital_invertido() + capital_trade) > (self.capital_inicial * config.USO_CAPITAL):
+            print(f"⛔ Límite capital alcanzado")
             return False
 
-        if capital_trade < config.MIN_TRADE_USD:
+        if capital_trade > self.capital:
             return False
 
         cantidad = capital_trade / precio
-
         self.capital -= capital_trade
 
         self.posiciones[symbol] = {
@@ -84,46 +120,38 @@ class Portfolio:
         return True
 
     # =========================
-    # EVALUAR
+    # GESTIÓN DE POSICIONES
     # =========================
-    def evaluar(self, symbol, precio):
+    def actualizar(self, precios):
 
-        if symbol not in self.posiciones:
-            return False
+        for symbol in list(self.posiciones.keys()):
 
-        pos = self.posiciones[symbol]
+            pos = self.posiciones[symbol]
+            precio = precios.get(symbol)
 
-        entry = pos["entry"]
-        pnl = (precio - entry) / entry
+            if precio is None:
+                continue
 
-        # actualizar máximo
-        if precio > pos["max_precio"]:
-            pos["max_precio"] = precio
+            pnl = (precio - pos["entry"]) / pos["entry"]
 
-        # activar trailing
-        if pnl > config.TRAILING_START:
-            pos["trailing"] = True
+            if precio > pos["max_precio"]:
+                pos["max_precio"] = precio
 
-        # STOP LOSS
-        if pnl <= config.STOP_LOSS:
-            self.cerrar(symbol, precio, pnl)
-            return True
+            # activar trailing
+            if pnl > config.TRAILING_START:
+                pos["trailing"] = True
 
-        # TRAILING DINÁMICO (ligado a volatilidad)
-        trailing_gap = config.TRAILING_GAP_BASE * (1 + pos["prob"])
-
-        if pos["trailing"]:
-            stop = pos["max_precio"] * (1 - trailing_gap)
-
-            if precio <= stop:
+            # stop loss
+            if pnl <= config.STOP_LOSS:
                 self.cerrar(symbol, precio, pnl)
-                return True
+                continue
 
-        return False
+            # trailing dinámico
+            if pos["trailing"]:
+                stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
+                if precio <= stop:
+                    self.cerrar(symbol, precio, pnl)
 
-    # =========================
-    # SELL
-    # =========================
     def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones[symbol]
@@ -133,12 +161,12 @@ class Portfolio:
 
         self.historial.append({
             "symbol": symbol,
-            "tipo": "SELL",
-            "pnl": round(pnl, 4),
-            "capital": round(self.capital, 2)
+            "pnl": pnl,
+            "capital": self.capital,
+            "tipo": "SELL"
         })
 
-        print(f"🔴 SELL {symbol} | pnl: {pnl:.4f}")
+        print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
 
         del self.posiciones[symbol]
 
@@ -146,11 +174,12 @@ class Portfolio:
     # DATA STREAMLIT
     # =========================
     def data(self):
-
         return {
             "capital": round(self.capital, 2),
             "capital_inicial": self.capital_inicial,
-            "exposicion": round(self.exposicion_actual(), 2),
             "posiciones": self.posiciones,
-            "historial": self.historial[-50]
+            "historial": self.historial
         }
+
+
+portfolio = Portfolio()
