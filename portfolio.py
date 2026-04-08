@@ -5,158 +5,137 @@ class Portfolio:
 
     def __init__(self):
         self.capital_total = config.CAPITAL_INICIAL
-        self.capital = config.CAPITAL_INICIAL
+        self.capital = config.CAPITAL_INICIAL * config.USO_CAPITAL
         self.posiciones = {}
         self.historial = []
         self.last_trade = 0
+        self.peak = self.capital
 
-        print(f"🚀 Capital inicial: {self.capital}")
-
-    # =========================
-    # CORRELACIÓN
-    # =========================
-    def grupo(self, symbol):
-        for g, lista in config.CORRELACION.items():
-            if symbol in lista:
-                return g
-        return None
-
-    def correlacion(self, symbol):
-        g = self.grupo(symbol)
-        for s in self.posiciones:
-            if self.grupo(s) == g:
-                return True
-        return False
+        print(f"🚀 Capital inicial: {self.capital_total}")
 
     # =========================
-    # CONTROL GLOBAL
+    # COOLDOWN DINÁMICO
     # =========================
-    def capital_usado(self):
-        return sum(p["inversion"] for p in self.posiciones.values())
+    def cooldown(self, volatilidad):
 
-    def puede_operar(self):
-        return (time.time() - self.last_trade) > config.COOLDOWN_BASE
+        if volatilidad > 0.04:
+            return config.COOLDOWN_BASE * 2
+
+        elif volatilidad < 0.015:
+            return config.COOLDOWN_BASE * 0.7
+
+        return config.COOLDOWN_BASE
+
+    def puede_operar(self, volatilidad):
+        return (time.time() - self.last_trade) > self.cooldown(volatilidad)
 
     # =========================
-    # APERTURA
+    # COMPRA
     # =========================
-    def abrir(self, signal):
+    def comprar(self, symbol, precio, prob, volatilidad):
 
-        symbol = signal["symbol"]
-        prob = signal["prob"]
-        precio = signal["precio"]
-
-        if not self.puede_operar():
-            return
+        if not self.puede_operar(volatilidad):
+            return False
 
         if symbol in self.posiciones:
-            return
+            return False
 
         if len(self.posiciones) >= config.MAX_POSICIONES:
-            return
+            return False
 
-        if self.correlacion(symbol):
-            return
-
-        # 🔥 CONTROL GLOBAL 60%
-        if self.capital_usado() >= self.capital_total * config.USO_CAPITAL:
-            return
-
-        # 🔥 TAMAÑO INSTITUCIONAL
+        # sizing institucional
         if prob >= config.UMBRAL_EXCELENTE:
-            peso = config.SIZE_EXCELENTE
+            size = config.SIZE_EXCELENTE
             tipo = "excelente"
+
         elif prob >= config.UMBRAL_BUENO:
-            peso = config.SIZE_BUENO
+            size = config.SIZE_BUENO_MIN
             tipo = "bueno"
+
         else:
-            return
+            return False
 
-        inversion = self.capital * peso
+        capital_trade = self.capital * size
 
-        if inversion < config.MIN_TRADE_USD:
-            return
+        if capital_trade < config.MIN_TRADE_USD:
+            return False
 
-        cantidad = inversion / precio
-
-        self.capital -= inversion
+        cantidad = capital_trade / precio
+        self.capital -= capital_trade
 
         self.posiciones[symbol] = {
-            "precio": precio,
+            "entry": precio,
             "cantidad": cantidad,
-            "inversion": inversion,
+            "inversion": capital_trade,
             "max_precio": precio,
             "tipo": tipo,
             "prob": prob,
+            "vol": volatilidad,
             "trailing": False
         }
 
         self.last_trade = time.time()
 
-        print(f"🟢 BUY {symbol} | ${inversion:.2f} | {tipo} | prob: {prob:.2f}")
+        print(f"🟢 BUY {symbol} | ${capital_trade:.2f} | prob {prob:.2f}")
+
+        return True
 
     # =========================
-    # GESTIÓN
+    # SALIDA INTELIGENTE
     # =========================
-    def actualizar(self, precios):
+    def evaluar(self, symbol, precio):
 
-        for symbol in list(self.posiciones.keys()):
+        pos = self.posiciones[symbol]
 
-            pos = self.posiciones[symbol]
-            precio = precios.get(symbol)
+        pnl = (precio - pos["entry"]) / pos["entry"]
 
-            if precio is None:
-                continue
+        if precio > pos["max_precio"]:
+            pos["max_precio"] = precio
 
-            pnl = (precio - pos["precio"]) / pos["precio"]
+        # activar trailing
+        if pnl > config.TRAILING_START:
+            pos["trailing"] = True
 
-            if precio > pos["max_precio"]:
-                pos["max_precio"] = precio
+        # trailing adaptativo
+        gap = config.TRAILING_GAP_BASE + pos["vol"]
 
-            # activar trailing
-            if pnl > config.TRAILING_START:
-                pos["trailing"] = True
+        if pos["trailing"]:
+            stop = pos["max_precio"] * (1 - gap)
 
-            # stop loss
-            if pnl <= config.STOP_LOSS:
-                self.cerrar(symbol, precio, pnl)
-                continue
+            if precio <= stop:
+                return True
 
-            # trailing dinámico
-            if pos["trailing"]:
-                stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
-                if precio <= stop:
-                    self.cerrar(symbol, precio, pnl)
+        # stop loss
+        if pnl <= config.STOP_LOSS:
+            return True
 
-    # =========================
-    # CIERRE
-    # =========================
-    def cerrar(self, symbol, precio, pnl):
+        return False
+
+    def cerrar(self, symbol, precio):
 
         pos = self.posiciones[symbol]
 
         valor = pos["cantidad"] * precio
+        pnl = (precio - pos["entry"]) / pos["entry"]
+
         self.capital += valor
 
         self.historial.append({
             "symbol": symbol,
-            "tipo": pos["tipo"],
-            "prob": pos["prob"],
+            "tipo": "SELL",
             "pnl": pnl,
             "capital": self.capital
         })
 
-        print(f"💰 SELL {symbol} | pnl: {pnl:.4f}")
+        print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
 
         del self.posiciones[symbol]
 
-    # =========================
-    # DATA
-    # =========================
     def data(self):
 
         return {
-            "capital": round(self.capital, 2),
+            "capital": self.capital,
+            "capital_inicial": self.capital_total,
             "posiciones": self.posiciones,
-            "historial": self.historial[-50:]
+            "historial": self.historial
         }
