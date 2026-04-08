@@ -1,44 +1,51 @@
 from flask import Flask, jsonify
-from portfolio import Portfolio
 import threading
 import time
-import random
+import config
+from services.scanner import analizar
+from portfolio import Portfolio
 
 app = Flask(__name__)
-portfolio = Portfolio()
 
-def bot():
+bot = Portfolio()
 
-    print("🚀 BOT INICIADO (única instancia)")
+def run_bot():
+
+    print("🚀 BOT INSTITUCIONAL INICIADO")
 
     while True:
+        try:
+            signals = []
+            precios = {}
 
-        precios = {
-            "BTC/USDT": 60000 + random.uniform(-300, 300),
-            "ETH/USDT": 3400 + random.uniform(-50, 50),
-            "SOL/USDT": 150 + random.uniform(-5, 5),
-            "ADA/USDT": 0.5 + random.uniform(-0.02, 0.02),
-            "XRP/USDT": 0.6 + random.uniform(-0.02, 0.02),
-            "AVAX/USDT": 35 + random.uniform(-2, 2),
-            "LINK/USDT": 18 + random.uniform(-1, 1),
-            "ATOM/USDT": 10 + random.uniform(-1, 1)
-        }
+            for symbol in config.CRYPTOS:
+                data = analizar(symbol)
+                if data:
+                    signals.append(data)
+                    precios[symbol] = data["precio"]
 
-        for s, p in precios.items():
-            prob = random.random()
-            portfolio.comprar(s, p, prob)
+            signals = sorted(signals, key=lambda x: x["prob"], reverse=True)
 
-        portfolio.evaluar(precios)
+            bot.actualizar(precios)
 
-        print(f"💰 Capital: {portfolio.capital:.2f}")
-        print(f"📊 Posiciones: {portfolio.posiciones}")
+            for s in signals:
+                bot.abrir(s)
 
-        time.sleep(10)
+            print(f"💰 Capital: {bot.capital}")
+            print(f"📊 Posiciones: {list(bot.posiciones.keys())}")
+
+            time.sleep(config.COOLDOWN_BASE)
+
+        except Exception as e:
+            print(f"❌ ERROR BOT: {e}")
+            time.sleep(10)
 
 @app.route("/data")
 def data():
-    return jsonify(portfolio.data())
+    return jsonify(bot.data())
+
+# 🔥 HILO DEL BOT
+threading.Thread(target=run_bot, daemon=True).start()
 
 if __name__ == "__main__":
-    threading.Thread(target=bot, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
