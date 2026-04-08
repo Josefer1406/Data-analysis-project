@@ -11,7 +11,7 @@ st.title("🚀 BOT CUANT INSTITUCIONAL PRO")
 # =========================
 
 try:
-    data = requests.get("http://localhost:8080/data").json()
+    data = requests.get("https://bot-crypto-production.up.railway.app/data").json()
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
