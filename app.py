@@ -13,23 +13,26 @@ SYMBOLS = [
     "LINK/USDT", "ATOM/USDT"
 ]
 
-# ✅ PROBABILIDAD SIMULADA
+# ✅ PRECIOS INICIALES REALISTAS
+precios = {
+    "BTC/USDT": 65000,
+    "ETH/USDT": 3500,
+    "SOL/USDT": 150,
+    "ADA/USDT": 0.5,
+    "XRP/USDT": 0.6,
+    "AVAX/USDT": 40,
+    "LINK/USDT": 20,
+    "ATOM/USDT": 12,
+}
+
+# ✅ SIMULACIÓN DE MERCADO (movimiento realista)
+def actualizar_precio(symbol):
+    cambio = random.uniform(-0.005, 0.005)  # ±0.5%
+    precios[symbol] *= (1 + cambio)
+    return precios[symbol]
+
 def generar_probabilidad():
     return random.uniform(0, 1)
-
-# ✅ PRECIOS REALISTAS
-def generar_precio(symbol):
-    precios = {
-        "BTC/USDT": random.uniform(60000, 70000),
-        "ETH/USDT": random.uniform(3000, 4000),
-        "SOL/USDT": random.uniform(100, 200),
-        "ADA/USDT": random.uniform(0.3, 0.8),
-        "XRP/USDT": random.uniform(0.4, 0.9),
-        "AVAX/USDT": random.uniform(20, 60),
-        "LINK/USDT": random.uniform(10, 30),
-        "ATOM/USDT": random.uniform(8, 20),
-    }
-    return precios.get(symbol, 100)
 
 def run_bot():
     while True:
@@ -37,15 +40,12 @@ def run_bot():
 
         for symbol in SYMBOLS:
             prob = generar_probabilidad()
+            precio = actualizar_precio(symbol)
 
-            print(f"{symbol} | prob: {prob:.2f}")
+            print(f"{symbol} | prob: {prob:.2f} | precio: {precio:.2f}")
 
-            if prob < config.PROB_MINIMA:
-                continue
-
-            precio = generar_precio(symbol)
-
-            portfolio.comprar(symbol, precio, prob)
+            if prob >= config.PROB_MINIMA:
+                portfolio.comprar(symbol, precio, prob)
 
             if symbol in portfolio.posiciones:
                 portfolio.vender(symbol, precio)
