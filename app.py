@@ -8,6 +8,7 @@ from portfolio import portfolio
 
 app = Flask(__name__)
 
+
 def bot():
 
     print("🚀 BOT INSTITUCIONAL INICIADO")
@@ -23,9 +24,14 @@ def bot():
             # SCAN
             # =========================
             for symbol in config.CRYPTOS:
-                score, precio, _, prob = analizar(symbol)
-                ranking.append((symbol, score, prob, precio))
-                precios[symbol] = precio
+
+                data = analizar(symbol)
+
+                if data is None:
+                    continue
+
+                ranking.append(data)
+                precios[symbol] = data["precio"]
 
             # =========================
             # GESTIÓN POSICIONES
@@ -33,17 +39,21 @@ def bot():
             portfolio.actualizar(precios)
 
             # =========================
-            # SELECCIÓN TOP (CLAVE)
+            # RANKING PROFESIONAL
             # =========================
-            ranking = sorted(ranking, key=lambda x: x[2], reverse=True)
+            ranking = sorted(ranking, key=lambda x: x["prob"], reverse=True)
 
-            top = ranking[:2]  # 🔥 SOLO TOP 2
+            top = ranking[:2]  # 🔥 solo elite trades
 
             # =========================
             # EJECUCIÓN
             # =========================
-            for symbol, score, prob, precio in top:
-                portfolio.comprar(symbol, precio, prob)
+            for asset in top:
+                portfolio.comprar(
+                    asset["symbol"],
+                    asset["precio"],
+                    asset["prob"]
+                )
 
             # =========================
             # COOLDOWN DINÁMICO
