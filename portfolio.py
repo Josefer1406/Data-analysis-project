@@ -7,7 +7,6 @@ class Portfolio:
         self.posiciones = {}
         self.cooldowns = {}
 
-        # 🔥 DEBUG INSTITUCIONAL (capital inicial real)
         print(f"🚀 Capital inicial: {self.capital}")
 
     def cooldown_dinamico(self, prob):
@@ -36,45 +35,46 @@ class Portfolio:
             return capital_disponible * config.RIESGO_BAJO
 
     def comprar(self, symbol, precio, prob):
-        # 🔒 límite de posiciones
         if len(self.posiciones) >= config.MAX_POSICIONES:
             return
 
-        # ⏳ cooldown por activo
         if not self.puede_operar(symbol):
+            return
+
+        if symbol in self.posiciones:
             return
 
         size = self.calcular_size(prob)
 
-        # 💰 capital mínimo
         if size < config.MIN_CAPITAL_OPERAR:
             return
 
-        # 🛑 evitar duplicar posición
-        if symbol in self.posiciones:
-            return
+        # ✅ CORRECTO: calcular cantidad
+        cantidad = size / precio
 
         self.posiciones[symbol] = {
-            "precio": precio,
-            "size": size
+            "precio_entrada": precio,
+            "size": size,
+            "cantidad": cantidad
         }
 
         self.capital -= size
         self.set_cooldown(symbol, prob)
 
-        print(f"🟢 BUY {symbol} | ${size:.2f} | prob: {prob:.2f}")
+        print(f"🟢 BUY {symbol} | ${size:.2f} | cantidad: {cantidad:.6f} | prob: {prob:.2f}")
 
     def vender(self, symbol, precio):
         if symbol not in self.posiciones:
             return
 
         posicion = self.posiciones[symbol]
-        pnl = (precio - posicion["precio"]) / posicion["precio"]
 
-        # 🎯 salida institucional
+        # ✅ valor real de la posición
+        valor_actual = posicion["cantidad"] * precio
+        pnl = (precio - posicion["precio_entrada"]) / posicion["precio_entrada"]
+
         if pnl <= config.STOP_LOSS or pnl >= config.TAKE_PROFIT:
-            resultado = posicion["size"] * (1 + pnl)
-            self.capital += resultado
+            self.capital += valor_actual
 
             print(f"💰 CERRAR {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
 
