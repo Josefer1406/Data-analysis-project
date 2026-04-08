@@ -9,25 +9,36 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
-# =========================
-# FILTRO DE MERCADO (🔥 CLAVE)
-# =========================
-def mercado_valido(ranking):
+def score_institucional(asset):
+    """
+    🧠 SCORING REAL TIPO HEDGE FUND
+    """
 
-    if not ranking:
+    prob = asset["prob"]
+    score = asset["score"]
+
+    # base
+    s = prob * 0.6 + (score / 3) * 0.4
+
+    # bonus por excelencia
+    if prob > 0.9:
+        s += 0.1
+
+    return s
+
+
+def filtro_calidad(asset):
+    """
+    🔥 FILTRO ULTRA SELECTIVO
+    """
+
+    if asset["prob"] < 0.82:
         return False
 
-    # promedio de probabilidad
-    avg_prob = sum([r["prob"] for r in ranking]) / len(ranking)
-
-    # contar activos fuertes
-    fuertes = sum(1 for r in ranking if r["prob"] >= config.UMBRAL_BUENO)
-
-    # 🔥 lógica institucional
-    if avg_prob < 0.65:
+    if asset["score"] < 2:
         return False
 
-    if fuertes < 2:
+    if asset["precio"] <= 0:
         return False
 
     return True
@@ -35,7 +46,7 @@ def mercado_valido(ranking):
 
 def bot():
 
-    print("🚀 BOT HEDGE FUND INICIADO")
+    print("🚀 BOT HEDGE FUND ULTRA ACTIVADO")
 
     contador = 0
 
@@ -45,7 +56,7 @@ def bot():
 
             print("\n🔎 Analizando mercado...")
 
-            ranking = []
+            candidatos = []
             precios = {}
 
             # =========================
@@ -55,72 +66,74 @@ def bot():
 
                 data = analizar(symbol)
 
-                if data is None or not isinstance(data, dict):
+                if data is None:
                     continue
 
-                if "prob" not in data or "precio" not in data or "symbol" not in data:
-                    continue
-
-                ranking.append(data)
                 precios[symbol] = data["precio"]
 
+                if not filtro_calidad(data):
+                    continue
+
+                # 🔥 añadir score institucional
+                data["score_final"] = score_institucional(data)
+
+                candidatos.append(data)
+
             # =========================
-            # ACTUALIZAR POSICIONES
+            # GESTIÓN POSICIONES
             # =========================
             portfolio.actualizar(precios)
 
             # =========================
-            # FILTRO DE MERCADO (🔥 CLAVE)
+            # SIN EDGE
             # =========================
-            if not mercado_valido(ranking):
-                print("⛔ Mercado NO favorable (no trade)")
+            if len(candidatos) == 0:
+                print("⛔ NO TRADE (mercado sin ventaja)")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
             # =========================
-            # FILTRO DE CALIDAD
+            # RANKING REAL
             # =========================
-            ranking = [r for r in ranking if r["prob"] >= config.UMBRAL_BUENO]
+            candidatos = sorted(
+                candidatos,
+                key=lambda x: x["score_final"],
+                reverse=True
+            )
 
-            if not ranking:
-                print("⛔ Sin señales fuertes")
+            # =========================
+            # CAPACIDAD
+            # =========================
+            espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
+
+            if espacios <= 0:
+                print("📊 Portafolio lleno")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # =========================
-            # CONTROL EXPOSICIÓN
-            # =========================
-            if portfolio.exposicion_actual() >= config.USO_CAPITAL:
-                print("⛔ Exposición máxima alcanzada")
-                time.sleep(config.CYCLE_TIME)
-                continue
-
-            # =========================
-            # RANKING
-            # =========================
-            ranking = sorted(ranking, key=lambda x: x["prob"], reverse=True)
-            top = ranking[:config.MAX_POSICIONES]
+            # 🔥 SOLO LOS MEJORES DE VERDAD
+            seleccion = candidatos[:espacios]
 
             # =========================
             # EJECUCIÓN
             # =========================
-            for asset in top:
+            for asset in seleccion:
 
-                try:
-                    ejecutado = portfolio.comprar(
-                        asset["symbol"],
-                        asset["precio"],
-                        asset["prob"]
+                ejecutado = portfolio.comprar(
+                    asset["symbol"],
+                    asset["precio"],
+                    asset["prob"]
+                )
+
+                if ejecutado:
+                    print(
+                        f"🟢 TRADE: {asset['symbol']} | "
+                        f"prob {round(asset['prob'],2)} | "
+                        f"score {round(asset['score_final'],2)}"
                     )
 
-                    if ejecutado:
-                        print(f"🟢 BUY {asset['symbol']} | prob {round(asset['prob'],2)}")
-
-                except Exception as e:
-                    print(f"⚠️ Error trade {asset['symbol']}: {e}")
-
             # =========================
-            # COOLDOWN DINÁMICO
+            # COOLDOWN
             # =========================
             portfolio.actualizar_cooldown()
 
@@ -128,15 +141,18 @@ def bot():
             # GUARDADO
             # =========================
             if contador % 20 == 0:
-                portfolio.guardar_resultados()
-                print("💾 Resultados guardados")
+                try:
+                    portfolio.guardar_resultados()
+                    print("💾 Resultados guardados")
+                except Exception as e:
+                    print(f"⚠️ Error guardando: {e}")
 
             # =========================
             # LOGS
             # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print(f"📉 Exposición: {round(portfolio.exposicion_actual()*100,2)}%")
+            print(f"📈 Candidatos reales: {len(candidatos)}")
             print(f"⏱ Cooldown: {portfolio.cooldown}s")
 
             time.sleep(config.CYCLE_TIME)
