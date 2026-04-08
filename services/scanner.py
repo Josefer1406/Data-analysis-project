@@ -5,6 +5,7 @@ import config
 
 exchange = ccxt.okx()
 
+
 def obtener_datos(symbol):
     ohlcv = exchange.fetch_ohlcv(symbol, timeframe=config.TIMEFRAME, limit=100)
     df = pd.DataFrame(ohlcv, columns=["time","open","high","low","close","volume"])
@@ -18,14 +19,18 @@ def analizar(symbol):
     if df is None or len(df) < 50:
         return None
 
+    # =========================
+    # FEATURES
+    # =========================
     df["ema20"] = df["close"].ewm(span=20).mean()
     df["ema50"] = df["close"].ewm(span=50).mean()
     df["returns"] = df["close"].pct_change()
-    df["volatilidad"] = df["returns"].rolling(10).std()
 
     precio = float(df["close"].iloc[-1])
-    vol = float(df["volatilidad"].iloc[-1])
 
+    # =========================
+    # SCORE
+    # =========================
     score = 0
 
     if df["ema20"].iloc[-1] > df["ema50"].iloc[-1]:
@@ -34,22 +39,39 @@ def analizar(symbol):
     if df["returns"].iloc[-1] > 0:
         score += 1
 
-    if precio > df["ema20"].iloc[-1]:
+    if df["close"].iloc[-1] > df["ema20"].iloc[-1]:
         score += 1
 
-    # probabilidad realista
-    prob = 0.4 + (score * 0.18)
+    # =========================
+    # PROBABILIDAD (NO LINEAL)
+    # =========================
+    prob_map = {
+        0: 0.1,
+        1: 0.35,
+        2: 0.65,
+        3: 0.90
+    }
 
-    if vol > config.VOLATILIDAD_LIMITE:
-        prob *= 0.7
+    prob = prob_map.get(score, 0.1)
 
-    prob = min(prob, 0.95)
+    # =========================
+    # VOLATILIDAD (FILTRO)
+    # =========================
+    volatilidad = df["returns"].std()
 
-    # 🔥 OUTPUT ESTÁNDAR (DICT)
+    if volatilidad > config.VOLATILIDAD_LIMITE:
+        return None
+
+    if volatilidad < config.VOLATILIDAD_MIN:
+        return None
+
+    # =========================
+    # SALIDA ESTÁNDAR (CLAVE)
+    # =========================
     return {
         "symbol": symbol,
         "score": score,
-        "precio": precio,
         "prob": prob,
-        "vol": vol
+        "precio": precio,
+        "volatilidad": float(volatilidad)
     }
