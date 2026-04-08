@@ -1,5 +1,5 @@
 # ==============================
-# CONFIG HEDGE FUND PRO
+# CONFIG HEDGE FUND PRO FINAL
 # ==============================
 
 # Capital
@@ -10,10 +10,8 @@ USO_CAPITAL = 0.60
 MAX_POSICIONES = 3
 MIN_TRADE_USD = 30
 
-# Timeframe real de mercado
-TIMEFRAME = "5m"   # 🔥 puedes cambiar a "1m", "15m", "1h"
-
-# Ciclo del bot
+# Timeframe
+TIMEFRAME = "5m"
 CYCLE_TIME = 15
 
 # Riesgo
@@ -27,10 +25,14 @@ TRAILING_GAP = 0.015
 UMBRAL_EXCELENTE = 0.9
 UMBRAL_BUENO = 0.75
 
-# Cooldown base (dinámico luego)
+# Cooldown
 COOLDOWN_BASE = 20
 
-# Universo de trading (TOP liquidez)
+# 🔥 FILTRO DE MERCADO (CLAVE)
+VOLATILIDAD_LIMITE = 0.06   # máximo permitido
+VOLATILIDAD_MIN = 0.005     # mínimo para evitar mercado muerto
+
+# Universo
 CRYPTOS = [
     "BTC/USDT", "ETH/USDT",
     "SOL/USDT", "AVAX/USDT",
@@ -38,7 +40,7 @@ CRYPTOS = [
     "LINK/USDT", "ATOM/USDT"
 ]
 
-# Clusters de correlación
+# Correlación
 CORRELACION = {
     "L1": ["BTC/USDT", "ETH/USDT"],
     "L2": ["SOL/USDT", "AVAX/USDT"],
