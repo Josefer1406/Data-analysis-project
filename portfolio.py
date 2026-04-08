@@ -1,96 +1,73 @@
+import time
 import config
-import random
 
-capital = config.CAPITAL_INICIAL
-posiciones = {}
-cooldowns = {}
+class Portfolio:
+    def __init__(self):
+        self.capital = config.CAPITAL_INICIAL
+        self.posiciones = {}
+        self.cooldowns = {}
 
-def capital_disponible():
-    return capital * (1 - config.RESERVA_CAPITAL)
+    def cooldown_dinamico(self, prob):
+        if prob > 0.9:
+            return 30
+        elif prob > 0.8:
+            return 60
+        else:
+            return config.COOLDOWN_BASE
 
-def puede_comprar(symbol):
-    return symbol not in cooldowns
+    def puede_operar(self, symbol):
+        ahora = time.time()
+        return symbol not in self.cooldowns or ahora >= self.cooldowns[symbol]
 
-def actualizar_cooldowns():
-    for s in list(cooldowns.keys()):
-        cooldowns[s] -= 1
-        if cooldowns[s] <= 0:
-            del cooldowns[s]
+    def set_cooldown(self, symbol, prob):
+        self.cooldowns[symbol] = time.time() + self.cooldown_dinamico(prob)
 
-def exposicion_total():
-    total = sum(p["inversion"] for p in posiciones.values())
-    return total / capital if capital > 0 else 0
+    def calcular_size(self, prob):
+        capital_disponible = self.capital * (1 - config.RESERVA_CAPITAL)
 
-def calcular_peso(probabilidad):
-    # EXCELENTE
-    if probabilidad >= config.UMBRAL_EXCELENTE:
-        return config.PESO_EXCELENTE
+        if prob > 0.9:
+            return capital_disponible * config.RIESGO_MAXIMO_POR_TRADE
+        elif prob > 0.8:
+            return capital_disponible * config.RIESGO_MEDIO
+        else:
+            return capital_disponible * config.RIESGO_BAJO
 
-    # BUENA
-    elif probabilidad >= config.UMBRAL_COMPRA:
-        return random.uniform(config.PESO_BUENO_MIN, config.PESO_BUENO_MAX)
+    def comprar(self, symbol, precio, prob):
+        if len(self.posiciones) >= config.MAX_POSICIONES:
+            return
 
-    return 0
+        if not self.puede_operar(symbol):
+            return
 
-def abrir_posicion(symbol, probabilidad, precio):
-    global capital
+        size = self.calcular_size(prob)
 
-    if len(posiciones) >= config.MAX_POSICIONES:
-        return
+        if size < config.MIN_CAPITAL_OPERAR:
+            return
 
-    if capital < config.MIN_CAPITAL_OPERAR:
-        return
+        self.posiciones[symbol] = {
+            "precio": precio,
+            "size": size
+        }
 
-    if exposicion_total() >= config.MAX_EXPOSICION_TOTAL:
-        return
+        self.capital -= size
+        self.set_cooldown(symbol, prob)
 
-    peso = calcular_peso(probabilidad)
+        print(f"🟢 BUY {symbol} | ${size:.2f} | prob: {prob}")
 
-    if peso == 0:
-        return
+    def vender(self, symbol, precio):
+        if symbol not in self.posiciones:
+            return
 
-    inversion = capital_disponible() * peso
+        posicion = self.posiciones[symbol]
+        pnl = (precio - posicion["precio"]) / posicion["precio"]
 
-    if inversion <= 0:
-        return
+        if pnl <= config.STOP_LOSS or pnl >= config.TAKE_PROFIT:
+            self.capital += posicion["size"] * (1 + pnl)
+            print(f"💰 CERRAR {symbol} | pnl: {pnl:.4f}")
+            del self.posiciones[symbol]
 
-    capital -= inversion
-
-    posiciones[symbol] = {
-        "inversion": inversion,
-        "entry": precio
-    }
-
-    print(f"🟢 BUY {symbol} | ${inversion:.2f} | peso: {peso:.2f}")
-
-def cerrar_posicion(symbol, pnl):
-    global capital
-
-    inversion = posiciones[symbol]["inversion"]
-    capital += inversion * (1 + pnl)
-
-    del posiciones[symbol]
-    cooldowns[symbol] = config.COOLDOWN
-
-def gestionar_riesgo():
-    for symbol in list(posiciones.keys()):
-        entry = posiciones[symbol]["entry"]
-
-        # simulación más realista
-        precio_actual = entry * random.uniform(0.97, 1.08)
-
-        pnl = (precio_actual - entry) / entry
-
-        print(f"🔍 {symbol} pnl: {pnl:.4f}")
-
-        if pnl <= config.STOP_LOSS:
-            print(f"🔴 STOP LOSS {symbol}")
-            cerrar_posicion(symbol, pnl)
-
-        elif pnl >= config.TAKE_PROFIT:
-            print(f"💰 TAKE PROFIT {symbol}")
-            cerrar_posicion(symbol, pnl)
-
-def estado():
-    print(f"💰 Capital: {round(capital, 2)}")
-    print(f"📊 Posiciones: {list(posiciones.keys())}")
+    def estado(self):
+        return {
+            "capital": self.capital,
+            "posiciones": list(self.posiciones.keys())
+        }
