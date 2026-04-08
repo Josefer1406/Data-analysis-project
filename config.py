@@ -2,8 +2,8 @@
 
 CAPITAL_INICIAL = 1000
 
-# Riesgo
-RIESGO_MAXIMO_POR_TRADE = 0.30  # solo para señales top
+# Riesgo por tipo de señal
+RIESGO_MAXIMO_POR_TRADE = 0.30
 RIESGO_MEDIO = 0.20
 RIESGO_BAJO = 0.15
 
@@ -13,15 +13,15 @@ PROB_MINIMA = 0.7
 # Máximo de posiciones
 MAX_POSICIONES = 4
 
-# Cooldown base (segundos)
+# Cooldown base
 COOLDOWN_BASE = 120
 
-# Stop loss y take profit
+# Gestión de riesgo
 STOP_LOSS = -0.03
 TAKE_PROFIT = 0.04
 
-# Capital mínimo para operar
+# Capital mínimo
 MIN_CAPITAL_OPERAR = 50
 
-# Reserva de capital
-RESERVA_CAPITAL = 0.1  # 10%
+# Reserva
+RESERVA_CAPITAL = 0.1
