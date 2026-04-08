@@ -9,7 +9,7 @@ st.title("🚀 BOT CUANT INSTITUCIONAL PRO")
 # URL API (IMPORTANTE)
 # =========================
 
-API_URL = "http://localhost:8080/data"
+API_URL = "https://data-analysis-project-production.up.railway.app/data"
 # Si usas Railway, cambia por:
 # API_URL = "https://tu-app.railway.app/data"
 
