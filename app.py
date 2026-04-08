@@ -9,28 +9,28 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
+# =========================
+# SCORING INSTITUCIONAL
+# =========================
 def score_institucional(asset):
-    """
-    🧠 SCORING REAL TIPO HEDGE FUND
-    """
 
     prob = asset["prob"]
     score = asset["score"]
 
-    # base
-    s = prob * 0.6 + (score / 3) * 0.4
+    # base combinado
+    s = (prob * 0.6) + ((score / 3) * 0.4)
 
-    # bonus por excelencia
+    # bonus convicción alta
     if prob > 0.9:
         s += 0.1
 
     return s
 
 
+# =========================
+# FILTRO ULTRA SELECTIVO
+# =========================
 def filtro_calidad(asset):
-    """
-    🔥 FILTRO ULTRA SELECTIVO
-    """
 
     if asset["prob"] < 0.82:
         return False
@@ -44,9 +44,12 @@ def filtro_calidad(asset):
     return True
 
 
+# =========================
+# BOT PRINCIPAL
+# =========================
 def bot():
 
-    print("🚀 BOT HEDGE FUND ULTRA ACTIVADO")
+    print("🚀 BOT HEDGE FUND REAL INICIADO")
 
     contador = 0
 
@@ -74,7 +77,6 @@ def bot():
                 if not filtro_calidad(data):
                     continue
 
-                # 🔥 añadir score institucional
                 data["score_final"] = score_institucional(data)
 
                 candidatos.append(data)
@@ -85,9 +87,9 @@ def bot():
             portfolio.actualizar(precios)
 
             # =========================
-            # SIN EDGE
+            # SIN EDGE = NO TRADE
             # =========================
-            if len(candidatos) == 0:
+            if not candidatos:
                 print("⛔ NO TRADE (mercado sin ventaja)")
                 time.sleep(config.CYCLE_TIME)
                 continue
@@ -102,16 +104,18 @@ def bot():
             )
 
             # =========================
-            # CAPACIDAD
+            # CONTROL DE CAPACIDAD
             # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
             if espacios <= 0:
-                print("📊 Portafolio lleno")
+                print("📊 Portafolio lleno (esperando salida)")
                 time.sleep(config.CYCLE_TIME)
                 continue
 
-            # 🔥 SOLO LOS MEJORES DE VERDAD
+            # =========================
+            # SELECCIÓN FINAL (TOP REAL)
+            # =========================
             seleccion = candidatos[:espacios]
 
             # =========================
@@ -133,12 +137,12 @@ def bot():
                     )
 
             # =========================
-            # COOLDOWN
+            # COOLDOWN DINÁMICO
             # =========================
             portfolio.actualizar_cooldown()
 
             # =========================
-            # GUARDADO
+            # GUARDADO RESULTADOS
             # =========================
             if contador % 20 == 0:
                 try:
@@ -152,7 +156,7 @@ def bot():
             # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print(f"📈 Candidatos reales: {len(candidatos)}")
+            print(f"📈 Candidatos: {len(candidatos)}")
             print(f"⏱ Cooldown: {portfolio.cooldown}s")
 
             time.sleep(config.CYCLE_TIME)
@@ -162,11 +166,17 @@ def bot():
             time.sleep(5)
 
 
+# =========================
+# API STREAMLIT
+# =========================
 @app.route("/data")
 def data():
     return jsonify(portfolio.data())
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
     threading.Thread(target=bot).start()
     app.run(host="0.0.0.0", port=8080)
