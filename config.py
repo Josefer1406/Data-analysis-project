@@ -1,5 +1,5 @@
 # ==============================
-# CONFIG INSTITUCIONAL PRO
+# CONFIG INSTITUCIONAL PRO REAL
 # ==============================
 
 CAPITAL_INICIAL = 1000
@@ -7,30 +7,43 @@ USO_CAPITAL = 0.60
 
 MAX_POSICIONES = 3
 
+# 🔥 ACTIVOS (CLAVE)
+CRYPTOS = [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "AVAX/USDT",
+    "ADA/USDT",
+    "XRP/USDT",
+    "LINK/USDT",
+    "ATOM/USDT"
+]
+
 # Tamaño por convicción
 SIZE_EXCELENTE = 0.30
 SIZE_BUENO_MIN = 0.10
 SIZE_BUENO_MAX = 0.18
 
 # Riesgo
-STOP_LOSS = -0.015  # más conservador
+STOP_LOSS = -0.015
 
-# Trailing inteligente
+# Trailing
 TRAILING_START = 0.02
 TRAILING_GAP_BASE = 0.008
 
-# IA thresholds (más estrictos)
+# IA thresholds
 UMBRAL_EXCELENTE = 0.92
 UMBRAL_BUENO = 0.80
 
 # Control
 MIN_TRADE_USD = 40
-
-# Cooldown dinámico base
 COOLDOWN_BASE = 30
 
 # Volatilidad
 VOLATILIDAD_LIMITE = 0.04
+
+# Timeframe
+TIMEFRAME = "5m"
 
 # Correlación
 CORRELACION = {
