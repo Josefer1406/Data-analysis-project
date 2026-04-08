@@ -1,5 +1,6 @@
 import config
 import time
+import csv
 
 class Portfolio:
 
@@ -35,9 +36,9 @@ class Portfolio:
         winrate = sum(1 for t in ultimos if t["pnl"] > 0) / len(ultimos)
 
         if winrate < 0.4:
-            self.cooldown = 60  # mercado malo
+            self.cooldown = 60
         elif winrate > 0.7:
-            self.cooldown = 10  # mercado bueno
+            self.cooldown = 10
         else:
             self.cooldown = 25
 
@@ -79,9 +80,7 @@ class Portfolio:
             print(f"⛔ Correlación evitada: {symbol}")
             return False
 
-        # =========================
         # SIZE POR CONVICCIÓN
-        # =========================
         if prob >= 0.9:
             size = 0.30
         elif prob >= 0.75:
@@ -91,9 +90,7 @@ class Portfolio:
 
         capital_trade = self.capital_inicial * size
 
-        # =========================
-        # CONTROL DURO GLOBAL
-        # =========================
+        # CONTROL GLOBAL
         if (self.capital_invertido() + capital_trade) > (self.capital_inicial * config.USO_CAPITAL):
             print(f"⛔ Límite capital alcanzado")
             return False
@@ -137,7 +134,7 @@ class Portfolio:
             if precio > pos["max_precio"]:
                 pos["max_precio"] = precio
 
-            # activar trailing
+            # trailing activation
             if pnl > config.TRAILING_START:
                 pos["trailing"] = True
 
@@ -176,7 +173,53 @@ class Portfolio:
         del self.posiciones[symbol]
 
     # =========================
-    # DATA STREAMLIT (PRO)
+    # PERFORMANCE (🔥 NUEVO)
+    # =========================
+    def resumen_performance(self):
+
+        total_trades = len(self.historial)
+
+        if total_trades == 0:
+            winrate = 0
+        else:
+            wins = sum(1 for t in self.historial if t["pnl"] > 0)
+            winrate = round(wins / total_trades, 2)
+
+        capital_final = round(self.capital, 2)
+        pnl = round(capital_final - self.capital_inicial, 2)
+
+        if self.capital_inicial > 0:
+            pnl_pct = round((pnl / self.capital_inicial) * 100, 2)
+        else:
+            pnl_pct = 0
+
+        return {
+            "version": config.BOT_VERSION,
+            "capital_inicial": self.capital_inicial,
+            "capital_final": capital_final,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
+            "trades": total_trades,
+            "winrate": winrate
+        }
+
+    # =========================
+    # GUARDAR RESULTADOS (🔥 NUEVO)
+    # =========================
+    def guardar_resultados(self):
+
+        data = self.resumen_performance()
+
+        with open("resultados_bot.csv", "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=data.keys())
+
+            if f.tell() == 0:
+                writer.writeheader()
+
+            writer.writerow(data)
+
+    # =========================
+    # DATA STREAMLIT
     # =========================
     def data(self):
 
