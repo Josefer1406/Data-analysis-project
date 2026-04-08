@@ -1,6 +1,7 @@
 import config
 import time
 import csv
+import os
 
 class Portfolio:
 
@@ -163,7 +164,8 @@ class Portfolio:
             "symbol": symbol,
             "pnl": float(round(pnl, 4)),
             "capital": float(round(self.capital, 2)),
-            "tipo": "SELL"
+            "tipo": "SELL",
+            "timestamp": time.time()
         }
 
         self.historial.append(trade)
@@ -173,7 +175,7 @@ class Portfolio:
         del self.posiciones[symbol]
 
     # =========================
-    # PERFORMANCE (🔥 NUEVO)
+    # PERFORMANCE
     # =========================
     def resumen_performance(self):
 
@@ -194,26 +196,32 @@ class Portfolio:
             pnl_pct = 0
 
         return {
-            "version": config.BOT_VERSION,
+            "timestamp": time.time(),
+            "version": getattr(config, "BOT_VERSION", "v1"),
             "capital_inicial": self.capital_inicial,
             "capital_final": capital_final,
             "pnl": pnl,
             "pnl_pct": pnl_pct,
             "trades": total_trades,
-            "winrate": winrate
+            "winrate": winrate,
+            "posiciones": len(self.posiciones)
         }
 
     # =========================
-    # GUARDAR RESULTADOS (🔥 NUEVO)
+    # GUARDAR RESULTADOS (PRO)
     # =========================
     def guardar_resultados(self):
 
+        archivo = "resultados_bot.csv"
         data = self.resumen_performance()
 
-        with open("resultados_bot.csv", "a", newline="") as f:
+        existe = os.path.isfile(archivo)
+
+        with open(archivo, mode="a", newline="") as f:
+
             writer = csv.DictWriter(f, fieldnames=data.keys())
 
-            if f.tell() == 0:
+            if not existe:
                 writer.writeheader()
 
             writer.writerow(data)
