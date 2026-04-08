@@ -1,11 +1,15 @@
 from flask import Flask, jsonify
 import time
 import random
+import threading
 from portfolio import Portfolio
 import config
 
 app = Flask(__name__)
+
+# ✅ Singleton (una sola instancia)
 portfolio = Portfolio()
+bot_running = False
 
 SYMBOLS = [
     "BTC/USDT", "ETH/USDT", "SOL/USDT",
@@ -13,7 +17,6 @@ SYMBOLS = [
     "LINK/USDT", "ATOM/USDT"
 ]
 
-# ✅ PRECIOS INICIALES REALISTAS
 precios = {
     "BTC/USDT": 65000,
     "ETH/USDT": 3500,
@@ -25,9 +28,8 @@ precios = {
     "ATOM/USDT": 12,
 }
 
-# ✅ SIMULACIÓN DE MERCADO (movimiento realista)
 def actualizar_precio(symbol):
-    cambio = random.uniform(-0.005, 0.005)  # ±0.5%
+    cambio = random.uniform(-0.005, 0.005)
     precios[symbol] *= (1 + cambio)
     return precios[symbol]
 
@@ -35,6 +37,15 @@ def generar_probabilidad():
     return random.uniform(0, 1)
 
 def run_bot():
+    global bot_running
+
+    if bot_running:
+        return
+
+    bot_running = True
+
+    print("🚀 BOT INICIADO (única instancia)")
+
     while True:
         print("\n🔎 Analizando mercado...")
 
@@ -64,7 +75,13 @@ def data():
     return jsonify(portfolio.estado())
 
 
+# ✅ INICIAR BOT SOLO UNA VEZ
+def start_bot():
+    thread = threading.Thread(target=run_bot)
+    thread.daemon = True
+    thread.start()
+
+start_bot()
+
 if __name__ == "__main__":
-    import threading
-    threading.Thread(target=run_bot).start()
     app.run(host="0.0.0.0", port=8080)
