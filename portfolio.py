@@ -7,6 +7,9 @@ class Portfolio:
         self.posiciones = {}
         self.cooldowns = {}
 
+        # 🔥 DEBUG INSTITUCIONAL (capital inicial real)
+        print(f"🚀 Capital inicial: {self.capital}")
+
     def cooldown_dinamico(self, prob):
         if prob > 0.9:
             return 30
@@ -33,15 +36,22 @@ class Portfolio:
             return capital_disponible * config.RIESGO_BAJO
 
     def comprar(self, symbol, precio, prob):
+        # 🔒 límite de posiciones
         if len(self.posiciones) >= config.MAX_POSICIONES:
             return
 
+        # ⏳ cooldown por activo
         if not self.puede_operar(symbol):
             return
 
         size = self.calcular_size(prob)
 
+        # 💰 capital mínimo
         if size < config.MIN_CAPITAL_OPERAR:
+            return
+
+        # 🛑 evitar duplicar posición
+        if symbol in self.posiciones:
             return
 
         self.posiciones[symbol] = {
@@ -52,7 +62,7 @@ class Portfolio:
         self.capital -= size
         self.set_cooldown(symbol, prob)
 
-        print(f"🟢 BUY {symbol} | ${size:.2f} | prob: {prob}")
+        print(f"🟢 BUY {symbol} | ${size:.2f} | prob: {prob:.2f}")
 
     def vender(self, symbol, precio):
         if symbol not in self.posiciones:
@@ -61,13 +71,17 @@ class Portfolio:
         posicion = self.posiciones[symbol]
         pnl = (precio - posicion["precio"]) / posicion["precio"]
 
+        # 🎯 salida institucional
         if pnl <= config.STOP_LOSS or pnl >= config.TAKE_PROFIT:
-            self.capital += posicion["size"] * (1 + pnl)
-            print(f"💰 CERRAR {symbol} | pnl: {pnl:.4f}")
+            resultado = posicion["size"] * (1 + pnl)
+            self.capital += resultado
+
+            print(f"💰 CERRAR {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
+
             del self.posiciones[symbol]
 
     def estado(self):
         return {
-            "capital": self.capital,
+            "capital": round(self.capital, 2),
             "posiciones": list(self.posiciones.keys())
         }
