@@ -1,36 +1,43 @@
 # ==============================
-# CONFIG INSTITUCIONAL FINAL
+# CONFIG INSTITUCIONAL PRO
 # ==============================
 
 CAPITAL_INICIAL = 1000
 
-# Uso de capital
+# 🔥 USO GLOBAL (CLAVE)
 USO_CAPITAL = 0.60
 
 # Posiciones
 MAX_POSICIONES = 3
 
-# Tamaño dinámico
+# Tamaño institucional
 SIZE_EXCELENTE = 0.30
-SIZE_BUENO_MIN = 0.15
-SIZE_BUENO_MAX = 0.20
+SIZE_BUENO = 0.18
 
 # Riesgo
-STOP_LOSS = -0.02
+STOP_LOSS = -0.025
 
-# Trailing adaptativo
-TRAILING_START = 0.015
-TRAILING_GAP = 0.01
+# Trailing institucional dinámico
+TRAILING_START = 0.02
+TRAILING_GAP = 0.012
 
-# IA thresholds
-UMBRAL_EXCELENTE = 0.90
-UMBRAL_BUENO = 0.75
+# IA thresholds (más estrictos)
+UMBRAL_EXCELENTE = 0.92
+UMBRAL_BUENO = 0.78
 
 # Control
-MIN_TRADE_USD = 30
-COOLDOWN = 20
+MIN_TRADE_USD = 40
+COOLDOWN_BASE = 25
 
-# Correlación
+# Mercado
+TIMEFRAME = "5m"
+
+CRYPTOS = [
+    "BTC/USDT","ETH/USDT","SOL/USDT","ADA/USDT",
+    "XRP/USDT","AVAX/USDT","LINK/USDT","ATOM/USDT"
+]
+
+# Correlación institucional
 CORRELACION = {
     "L1": ["BTC/USDT", "ETH/USDT"],
     "L2": ["SOL/USDT", "AVAX/USDT"],
