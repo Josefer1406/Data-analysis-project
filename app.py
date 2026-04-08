@@ -7,13 +7,29 @@ import config
 app = Flask(__name__)
 portfolio = Portfolio()
 
-SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "ADA/USDT", "XRP/USDT", "AVAX/USDT", "LINK/USDT", "ATOM/USDT"]
+SYMBOLS = [
+    "BTC/USDT", "ETH/USDT", "SOL/USDT",
+    "ADA/USDT", "XRP/USDT", "AVAX/USDT",
+    "LINK/USDT", "ATOM/USDT"
+]
 
+# ✅ PROBABILIDAD SIMULADA
 def generar_probabilidad():
     return random.uniform(0, 1)
 
-def generar_precio():
-    return random.uniform(100, 70000)
+# ✅ PRECIOS REALISTAS
+def generar_precio(symbol):
+    precios = {
+        "BTC/USDT": random.uniform(60000, 70000),
+        "ETH/USDT": random.uniform(3000, 4000),
+        "SOL/USDT": random.uniform(100, 200),
+        "ADA/USDT": random.uniform(0.3, 0.8),
+        "XRP/USDT": random.uniform(0.4, 0.9),
+        "AVAX/USDT": random.uniform(20, 60),
+        "LINK/USDT": random.uniform(10, 30),
+        "ATOM/USDT": random.uniform(8, 20),
+    }
+    return precios.get(symbol, 100)
 
 def run_bot():
     while True:
@@ -27,7 +43,7 @@ def run_bot():
             if prob < config.PROB_MINIMA:
                 continue
 
-            precio = generar_precio()
+            precio = generar_precio(symbol)
 
             portfolio.comprar(symbol, precio, prob)
 
