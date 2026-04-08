@@ -1,81 +1,162 @@
+import config
+import random
 import time
 
 class Portfolio:
+
     def __init__(self):
-        self.capital = 1000
+        self.capital_total = config.CAPITAL_INICIAL
+        self.capital = config.CAPITAL_INICIAL * config.USO_CAPITAL
         self.posiciones = {}
         self.historial = []
-        self.trades = 0
-        self.equity_curve = []
+        self.last_trade_time = 0
 
-        print(f"🚀 Capital inicial: {self.capital}")
+        print(f"🚀 Capital inicial: {self.capital_total}")
+
+    # =========================
+    # CORRELACIÓN
+    # =========================
+
+    def grupo(self, symbol):
+        for g, activos in config.CORRELACION_GRUPOS.items():
+            if symbol in activos:
+                return g
+        return None
+
+    def correlacion(self, symbol):
+        g = self.grupo(symbol)
+        for s in self.posiciones:
+            if self.grupo(s) == g:
+                return True
+        return False
+
+    # =========================
+    # COOLDOWN DINÁMICO
+    # =========================
+
+    def puede_operar(self):
+        ahora = time.time()
+        return (ahora - self.last_trade_time) > config.COOLDOWN_BASE
+
+    # =========================
+    # COMPRA INSTITUCIONAL
+    # =========================
 
     def comprar(self, symbol, precio, prob):
+
+        if not self.puede_operar():
+            return
+
         if symbol in self.posiciones:
             return
 
-        if prob >= 0.85:
-            porcentaje = 0.30
-        elif prob >= 0.70:
-            porcentaje = 0.20
-        else:
-            porcentaje = 0.10
-
-        monto = self.capital * porcentaje
-
-        if monto < 10:
+        if len(self.posiciones) >= config.MAX_POSICIONES:
             return
 
-        cantidad = monto / precio
+        if self.correlacion(symbol):
+            return
 
-        self.capital -= monto
+        # calidad de señal
+        if prob >= config.UMBRAL_EXCELENTE:
+            size = config.SIZE_EXCELENTE
+
+        elif prob >= config.UMBRAL_BUENO:
+            size = random.uniform(config.SIZE_BUENO_MIN, config.SIZE_BUENO_MAX)
+
+        else:
+            return
+
+        capital_trade = self.capital * size
+
+        if capital_trade < config.MIN_TRADE_USD:
+            return
+
+        cantidad = capital_trade / precio
+
+        self.capital -= capital_trade
 
         self.posiciones[symbol] = {
             "precio": precio,
             "cantidad": cantidad,
-            "timestamp": time.time()
+            "inversion": capital_trade,
+            "max_precio": precio,
+            "trailing": False
         }
 
-        print(f"🟢 BUY {symbol} | ${monto:.2f} | prob: {prob:.2f}")
+        self.last_trade_time = time.time()
 
-    def vender(self, symbol, precio_actual):
-        if symbol not in self.posiciones:
-            return
+        print(f"🟢 BUY {symbol} | ${capital_trade:.2f} | prob: {prob:.2f}")
 
-        posicion = self.posiciones[symbol]
+    # =========================
+    # GESTIÓN DINÁMICA
+    # =========================
 
-        precio_entrada = posicion["precio"]
-        cantidad = posicion["cantidad"]
+    def evaluar(self, precios):
 
-        pnl = (precio_actual - precio_entrada) / precio_entrada
+        for symbol in list(self.posiciones.keys()):
 
-        # TP / SL institucional
-        if pnl >= 0.04 or pnl <= -0.02:
+            if symbol not in precios:
+                continue
 
-            valor = cantidad * precio_actual
-            self.capital += valor
-            self.trades += 1
+            pos = self.posiciones[symbol]
 
-            trade = {
-                "symbol": symbol,
-                "entrada": precio_entrada,
-                "salida": precio_actual,
-                "pnl": pnl,
-                "timestamp": time.time()
-            }
+            precio = precios[symbol]
+            pnl = (precio - pos["precio"]) / pos["precio"]
 
-            self.historial.append(trade)
-            self.equity_curve.append(self.capital)
+            # actualizar máximo
+            if precio > pos["max_precio"]:
+                pos["max_precio"] = precio
 
-            print(f"💰 SELL {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
+            # activar trailing
+            if pnl >= config.TRAILING_START:
+                pos["trailing"] = True
 
-            del self.posiciones[symbol]
+            # stop loss
+            if pnl <= config.STOP_LOSS:
+                self.cerrar(symbol, precio, pnl)
+                continue
 
-    def estado(self):
+            # trailing dinámico
+            if pos["trailing"]:
+                stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
+
+                if precio <= stop:
+                    self.cerrar(symbol, precio, pnl)
+
+    # =========================
+    # CIERRE
+    # =========================
+
+    def cerrar(self, symbol, precio, pnl):
+
+        pos = self.posiciones[symbol]
+
+        valor = pos["cantidad"] * precio
+        self.capital += valor
+
+        trade = {
+            "symbol": symbol,
+            "pnl": round(pnl, 4),
+            "capital": round(self.capital, 2)
+        }
+
+        self.historial.append(trade)
+
+        print(f"💰 SELL {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
+
+        del self.posiciones[symbol]
+
+    # =========================
+    # DATA LIMPIA STREAMLIT
+    # =========================
+
+    def data(self):
+
         return {
-            "capital": self.capital,
+            "capital": float(round(self.capital, 2)),
+            "capital_total": float(self.capital_total),
+            "num_posiciones": int(len(self.posiciones)),
             "posiciones": list(self.posiciones.keys()),
-            "historial": self.historial[-20:],  # últimos trades
-            "trades": self.trades,
-            "equity_curve": self.equity_curve
+            "trades": int(len(self.historial)),
+            "historial": list(self.historial)
         }
