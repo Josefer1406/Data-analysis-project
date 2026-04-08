@@ -1,87 +1,45 @@
 from flask import Flask, jsonify
+from portfolio import Portfolio
+import threading
 import time
 import random
-import threading
-from portfolio import Portfolio
-import config
 
 app = Flask(__name__)
-
-# ✅ Singleton (una sola instancia)
 portfolio = Portfolio()
-bot_running = False
 
-SYMBOLS = [
-    "BTC/USDT", "ETH/USDT", "SOL/USDT",
-    "ADA/USDT", "XRP/USDT", "AVAX/USDT",
-    "LINK/USDT", "ATOM/USDT"
-]
-
-precios = {
-    "BTC/USDT": 65000,
-    "ETH/USDT": 3500,
-    "SOL/USDT": 150,
-    "ADA/USDT": 0.5,
-    "XRP/USDT": 0.6,
-    "AVAX/USDT": 40,
-    "LINK/USDT": 20,
-    "ATOM/USDT": 12,
-}
-
-def actualizar_precio(symbol):
-    cambio = random.uniform(-0.005, 0.005)
-    precios[symbol] *= (1 + cambio)
-    return precios[symbol]
-
-def generar_probabilidad():
-    return random.uniform(0, 1)
-
-def run_bot():
-    global bot_running
-
-    if bot_running:
-        return
-
-    bot_running = True
-
-    print("🚀 BOT INICIADO (única instancia)")
+def bot():
 
     while True:
+
         print("\n🔎 Analizando mercado...")
 
-        for symbol in SYMBOLS:
-            prob = generar_probabilidad()
-            precio = actualizar_precio(symbol)
+        precios = {
+            "BTC/USDT": 64000 + random.uniform(-200, 200),
+            "ETH/USDT": 3400 + random.uniform(-50, 50),
+            "SOL/USDT": 145 + random.uniform(-5, 5),
+            "ADA/USDT": 0.5 + random.uniform(-0.02, 0.02),
+            "XRP/USDT": 0.58 + random.uniform(-0.02, 0.02),
+            "AVAX/USDT": 38 + random.uniform(-2, 2),
+            "LINK/USDT": 19 + random.uniform(-1, 1),
+            "ATOM/USDT": 12 + random.uniform(-1, 1)
+        }
 
-            print(f"{symbol} | prob: {prob:.2f} | precio: {precio:.2f}")
+        for s, p in precios.items():
+            prob = random.random()
+            portfolio.comprar(s, p, prob)
 
-            if prob >= config.PROB_MINIMA:
-                portfolio.comprar(symbol, precio, prob)
+        portfolio.evaluar(precios)
 
-            if symbol in portfolio.posiciones:
-                portfolio.vender(symbol, precio)
-
-        estado = portfolio.estado()
-
-        print(f"💰 Capital: {estado['capital']:.2f}")
-        print(f"📊 Posiciones: {estado['posiciones']}")
-        print("⏳ Ciclo completado...")
+        print(f"💰 Capital: {portfolio.capital:.2f}")
+        print(f"📊 Posiciones: {portfolio.posiciones}")
+        print("⏳ Ciclo completado...\n")
 
         time.sleep(10)
 
-
 @app.route("/data")
 def data():
-    return jsonify(portfolio.estado())
-
-
-# ✅ INICIAR BOT SOLO UNA VEZ
-def start_bot():
-    thread = threading.Thread(target=run_bot)
-    thread.daemon = True
-    thread.start()
-
-start_bot()
+    return jsonify(portfolio.data())
 
 if __name__ == "__main__":
+    threading.Thread(target=bot, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
