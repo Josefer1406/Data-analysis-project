@@ -9,9 +9,7 @@ def capital_disponible():
     return capital * (1 - config.RESERVA_CAPITAL)
 
 def puede_comprar(symbol):
-    if symbol in cooldowns and cooldowns[symbol] > 0:
-        return False
-    return True
+    return symbol not in cooldowns
 
 def actualizar_cooldowns():
     for s in list(cooldowns.keys()):
@@ -23,7 +21,18 @@ def exposicion_total():
     total = sum(p["inversion"] for p in posiciones.values())
     return total / capital if capital > 0 else 0
 
-def abrir_posicion(symbol, probabilidad):
+def calcular_peso(probabilidad):
+    # EXCELENTE
+    if probabilidad >= config.UMBRAL_EXCELENTE:
+        return config.PESO_EXCELENTE
+
+    # BUENA
+    elif probabilidad >= config.UMBRAL_COMPRA:
+        return random.uniform(config.PESO_BUENO_MIN, config.PESO_BUENO_MAX)
+
+    return 0
+
+def abrir_posicion(symbol, probabilidad, precio):
     global capital
 
     if len(posiciones) >= config.MAX_POSICIONES:
@@ -35,11 +44,10 @@ def abrir_posicion(symbol, probabilidad):
     if exposicion_total() >= config.MAX_EXPOSICION_TOTAL:
         return
 
-    # Position sizing institucional
-    if probabilidad >= config.UMBRAL_COMPRA_FUERTE:
-        peso = config.MAX_PESO_POR_ACTIVO
-    else:
-        peso = config.MIN_PESO_POR_ACTIVO
+    peso = calcular_peso(probabilidad)
+
+    if peso == 0:
+        return
 
     inversion = capital_disponible() * peso
 
@@ -50,10 +58,10 @@ def abrir_posicion(symbol, probabilidad):
 
     posiciones[symbol] = {
         "inversion": inversion,
-        "entry": 1.0
+        "entry": precio
     }
 
-    print(f"🟢 BUY {symbol} | ${inversion:.2f}")
+    print(f"🟢 BUY {symbol} | ${inversion:.2f} | peso: {peso:.2f}")
 
 def cerrar_posicion(symbol, pnl):
     global capital
@@ -66,7 +74,12 @@ def cerrar_posicion(symbol, pnl):
 
 def gestionar_riesgo():
     for symbol in list(posiciones.keys()):
-        pnl = random.uniform(-0.05, 0.08)
+        entry = posiciones[symbol]["entry"]
+
+        # simulación más realista
+        precio_actual = entry * random.uniform(0.97, 1.08)
+
+        pnl = (precio_actual - entry) / entry
 
         print(f"🔍 {symbol} pnl: {pnl:.4f}")
 
