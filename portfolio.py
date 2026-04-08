@@ -152,6 +152,9 @@ class Portfolio:
                 if precio <= stop:
                     self.cerrar(symbol, precio, pnl)
 
+    # =========================
+    # CIERRE DE POSICIÓN
+    # =========================
     def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones[symbol]
@@ -159,24 +162,39 @@ class Portfolio:
         valor = pos["cantidad"] * precio
         self.capital += valor
 
-        self.historial.append({
+        trade = {
             "symbol": symbol,
-            "pnl": pnl,
-            "capital": self.capital,
+            "pnl": float(round(pnl, 4)),
+            "capital": float(round(self.capital, 2)),
             "tipo": "SELL"
-        })
+        }
+
+        self.historial.append(trade)
 
         print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
 
         del self.posiciones[symbol]
 
     # =========================
-    # DATA STREAMLIT
+    # DATA STREAMLIT (PRO)
     # =========================
     def data(self):
+
+        capital_actual = round(self.capital, 2)
+        capital_inicial = self.capital_inicial
+
+        pnl = round(capital_actual - capital_inicial, 2)
+
+        if capital_inicial > 0:
+            pnl_pct = round((pnl / capital_inicial) * 100, 2)
+        else:
+            pnl_pct = 0
+
         return {
-            "capital": round(self.capital, 2),
-            "capital_inicial": self.capital_inicial,
+            "capital": capital_actual,
+            "capital_inicial": capital_inicial,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
             "posiciones": self.posiciones,
             "historial": self.historial
         }
