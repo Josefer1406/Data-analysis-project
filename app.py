@@ -9,11 +9,35 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
+# =========================
+# FILTRO DE MERCADO (🔥 CLAVE)
+# =========================
+def mercado_valido(ranking):
+
+    if not ranking:
+        return False
+
+    # promedio de probabilidad
+    avg_prob = sum([r["prob"] for r in ranking]) / len(ranking)
+
+    # contar activos fuertes
+    fuertes = sum(1 for r in ranking if r["prob"] >= config.UMBRAL_BUENO)
+
+    # 🔥 lógica institucional
+    if avg_prob < 0.65:
+        return False
+
+    if fuertes < 2:
+        return False
+
+    return True
+
+
 def bot():
 
-    print("🚀 BOT INSTITUCIONAL INICIADO")
+    print("🚀 BOT HEDGE FUND INICIADO")
 
-    contador = 0  # 🔥 guardado automático
+    contador = 0
 
     while True:
         try:
@@ -25,22 +49,16 @@ def bot():
             precios = {}
 
             # =========================
-            # SCAN PROFESIONAL
+            # SCAN
             # =========================
             for symbol in config.CRYPTOS:
 
                 data = analizar(symbol)
 
-                # 🔥 PROTECCIÓN TOTAL (evita errores)
                 if data is None or not isinstance(data, dict):
                     continue
 
-                # validar estructura mínima
                 if "prob" not in data or "precio" not in data or "symbol" not in data:
-                    continue
-
-                # 🔥 FILTRO ANTI BASURA
-                if data["prob"] < config.UMBRAL_BUENO:
                     continue
 
                 ranking.append(data)
@@ -52,7 +70,25 @@ def bot():
             portfolio.actualizar(precios)
 
             # =========================
-            # CONTROL DE EXPOSICIÓN (HEDGE FUND)
+            # FILTRO DE MERCADO (🔥 CLAVE)
+            # =========================
+            if not mercado_valido(ranking):
+                print("⛔ Mercado NO favorable (no trade)")
+                time.sleep(config.CYCLE_TIME)
+                continue
+
+            # =========================
+            # FILTRO DE CALIDAD
+            # =========================
+            ranking = [r for r in ranking if r["prob"] >= config.UMBRAL_BUENO]
+
+            if not ranking:
+                print("⛔ Sin señales fuertes")
+                time.sleep(config.CYCLE_TIME)
+                continue
+
+            # =========================
+            # CONTROL EXPOSICIÓN
             # =========================
             if portfolio.exposicion_actual() >= config.USO_CAPITAL:
                 print("⛔ Exposición máxima alcanzada")
@@ -60,23 +96,13 @@ def bot():
                 continue
 
             # =========================
-            # NO OPERAR SI NO HAY EDGE
-            # =========================
-            if not ranking:
-                print("⛔ Sin oportunidades reales")
-                time.sleep(config.CYCLE_TIME)
-                continue
-
-            # =========================
-            # RANKING (MEJORES PRIMERO)
+            # RANKING
             # =========================
             ranking = sorted(ranking, key=lambda x: x["prob"], reverse=True)
-
-            # 🔥 SOLO TOP INSTITUCIONAL
             top = ranking[:config.MAX_POSICIONES]
 
             # =========================
-            # EJECUCIÓN CONTROLADA
+            # EJECUCIÓN
             # =========================
             for asset in top:
 
@@ -88,10 +114,10 @@ def bot():
                     )
 
                     if ejecutado:
-                        print(f"🟢 Compra ejecutada: {asset['symbol']} | prob: {round(asset['prob'],2)}")
+                        print(f"🟢 BUY {asset['symbol']} | prob {round(asset['prob'],2)}")
 
                 except Exception as e:
-                    print(f"⚠️ Error ejecutando trade {asset['symbol']}: {e}")
+                    print(f"⚠️ Error trade {asset['symbol']}: {e}")
 
             # =========================
             # COOLDOWN DINÁMICO
@@ -99,17 +125,14 @@ def bot():
             portfolio.actualizar_cooldown()
 
             # =========================
-            # GUARDADO AUTOMÁTICO
+            # GUARDADO
             # =========================
             if contador % 20 == 0:
-                try:
-                    portfolio.guardar_resultados()
-                    print("💾 Resultados guardados")
-                except Exception as e:
-                    print(f"⚠️ Error guardando resultados: {e}")
+                portfolio.guardar_resultados()
+                print("💾 Resultados guardados")
 
             # =========================
-            # LOGS PROFESIONALES
+            # LOGS
             # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
