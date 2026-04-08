@@ -8,15 +8,20 @@ class Portfolio:
     def __init__(self):
         self.capital_inicial = config.CAPITAL_INICIAL
         self.capital = config.CAPITAL_INICIAL
+        self.peak_capital = self.capital
+
         self.posiciones = {}
         self.historial = []
+
         self.last_trade = 0
         self.cooldown = config.COOLDOWN_BASE
+
+        self.modo_defensivo = False
 
         print(f"🚀 Capital inicial: {self.capital_inicial}")
 
     # =========================
-    # EXPOSICIÓN REAL
+    # EXPOSICIÓN
     # =========================
     def capital_invertido(self):
         return sum(p["inversion"] for p in self.posiciones.values())
@@ -25,12 +30,35 @@ class Portfolio:
         return self.capital_invertido() / self.capital_inicial
 
     # =========================
+    # DRAWDOWN CONTROL (🔥 CLAVE)
+    # =========================
+    def actualizar_drawdown(self):
+
+        if self.capital > self.peak_capital:
+            self.peak_capital = self.capital
+
+        dd = (self.capital - self.peak_capital) / self.peak_capital
+
+        # 🔴 CORTE TOTAL
+        if dd < -0.25:
+            print("🛑 STOP TOTAL: drawdown crítico")
+            return False
+
+        # 🟡 MODO DEFENSIVO
+        if dd < -0.10:
+            self.modo_defensivo = True
+        else:
+            self.modo_defensivo = False
+
+        return True
+
+    # =========================
     # COOLDOWN DINÁMICO
     # =========================
     def actualizar_cooldown(self):
 
         if len(self.historial) < 5:
-            self.cooldown = 15
+            self.cooldown = 20
             return
 
         ultimos = self.historial[-5:]
@@ -47,7 +75,7 @@ class Portfolio:
         return (time.time() - self.last_trade) > self.cooldown
 
     # =========================
-    # FILTRO ANTICORRELACIÓN
+    # ANTICORRELACIÓN
     # =========================
     def correlacionado(self, symbol):
 
@@ -64,9 +92,12 @@ class Portfolio:
         return False
 
     # =========================
-    # COMPRA INSTITUCIONAL
+    # COMPRA INTELIGENTE
     # =========================
     def comprar(self, symbol, precio, prob):
+
+        if not self.actualizar_drawdown():
+            return False
 
         if not self.puede_operar():
             return False
@@ -81,7 +112,7 @@ class Portfolio:
             print(f"⛔ Correlación evitada: {symbol}")
             return False
 
-        # SIZE POR CONVICCIÓN
+        # 🔥 IA DE RIESGO
         if prob >= 0.9:
             size = 0.30
         elif prob >= 0.75:
@@ -89,11 +120,13 @@ class Portfolio:
         else:
             return False
 
+        # 🔴 MODO DEFENSIVO
+        if self.modo_defensivo:
+            size *= 0.5  # reduce riesgo
+
         capital_trade = self.capital_inicial * size
 
-        # CONTROL GLOBAL
         if (self.capital_invertido() + capital_trade) > (self.capital_inicial * config.USO_CAPITAL):
-            print(f"⛔ Límite capital alcanzado")
             return False
 
         if capital_trade > self.capital:
@@ -118,7 +151,7 @@ class Portfolio:
         return True
 
     # =========================
-    # GESTIÓN DE POSICIONES
+    # GESTIÓN POSICIONES
     # =========================
     def actualizar(self, precios):
 
@@ -135,24 +168,18 @@ class Portfolio:
             if precio > pos["max_precio"]:
                 pos["max_precio"] = precio
 
-            # trailing activation
             if pnl > config.TRAILING_START:
                 pos["trailing"] = True
 
-            # stop loss
             if pnl <= config.STOP_LOSS:
                 self.cerrar(symbol, precio, pnl)
                 continue
 
-            # trailing dinámico
             if pos["trailing"]:
                 stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
                 if precio <= stop:
                     self.cerrar(symbol, precio, pnl)
 
-    # =========================
-    # CIERRE DE POSICIÓN
-    # =========================
     def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones[symbol]
@@ -160,15 +187,13 @@ class Portfolio:
         valor = pos["cantidad"] * precio
         self.capital += valor
 
-        trade = {
+        self.historial.append({
             "symbol": symbol,
-            "pnl": float(round(pnl, 4)),
-            "capital": float(round(self.capital, 2)),
+            "pnl": pnl,
+            "capital": self.capital,
             "tipo": "SELL",
             "timestamp": time.time()
-        }
-
-        self.historial.append(trade)
+        })
 
         print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
 
@@ -179,36 +204,22 @@ class Portfolio:
     # =========================
     def resumen_performance(self):
 
-        total_trades = len(self.historial)
+        total = len(self.historial)
+        wins = sum(1 for t in self.historial if t["pnl"] > 0)
 
-        if total_trades == 0:
-            winrate = 0
-        else:
-            wins = sum(1 for t in self.historial if t["pnl"] > 0)
-            winrate = round(wins / total_trades, 2)
+        winrate = (wins / total) if total > 0 else 0
 
-        capital_final = round(self.capital, 2)
-        pnl = round(capital_final - self.capital_inicial, 2)
-
-        if self.capital_inicial > 0:
-            pnl_pct = round((pnl / self.capital_inicial) * 100, 2)
-        else:
-            pnl_pct = 0
+        pnl = self.capital - self.capital_inicial
 
         return {
-            "timestamp": time.time(),
-            "version": getattr(config, "BOT_VERSION", "v1"),
-            "capital_inicial": self.capital_inicial,
-            "capital_final": capital_final,
+            "capital": self.capital,
             "pnl": pnl,
-            "pnl_pct": pnl_pct,
-            "trades": total_trades,
-            "winrate": winrate,
-            "posiciones": len(self.posiciones)
+            "winrate": round(winrate, 2),
+            "trades": total
         }
 
     # =========================
-    # GUARDAR RESULTADOS (PRO)
+    # GUARDADO
     # =========================
     def guardar_resultados(self):
 
@@ -217,7 +228,7 @@ class Portfolio:
 
         existe = os.path.isfile(archivo)
 
-        with open(archivo, mode="a", newline="") as f:
+        with open(archivo, "a", newline="") as f:
 
             writer = csv.DictWriter(f, fieldnames=data.keys())
 
@@ -227,27 +238,15 @@ class Portfolio:
             writer.writerow(data)
 
     # =========================
-    # DATA STREAMLIT
+    # DATA API
     # =========================
     def data(self):
-
-        capital_actual = round(self.capital, 2)
-        capital_inicial = self.capital_inicial
-
-        pnl = round(capital_actual - capital_inicial, 2)
-
-        if capital_inicial > 0:
-            pnl_pct = round((pnl / capital_inicial) * 100, 2)
-        else:
-            pnl_pct = 0
-
         return {
-            "capital": capital_actual,
-            "capital_inicial": capital_inicial,
-            "pnl": pnl,
-            "pnl_pct": pnl_pct,
+            "capital": self.capital,
+            "capital_inicial": self.capital_inicial,
             "posiciones": self.posiciones,
-            "historial": self.historial
+            "historial": self.historial,
+            "modo_defensivo": self.modo_defensivo
         }
 
 
