@@ -43,7 +43,7 @@ def bot():
             # =========================
             ranking = sorted(ranking, key=lambda x: x["prob"], reverse=True)
 
-            top = ranking[:2]  # 🔥 solo elite trades
+            top = ranking[:3]  # 🔥 solo elite trades
 
             # =========================
             # EJECUCIÓN
