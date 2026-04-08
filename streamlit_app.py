@@ -1,19 +1,32 @@
-import streamlit as st
+ import streamlit as st
 import requests
 import pandas as pd
 
 st.set_page_config(layout="wide")
-
 st.title("🚀 BOT CUANT INSTITUCIONAL PRO")
 
 # =========================
-# CONEXIÓN AL BOT
+# URL API (IMPORTANTE)
+# =========================
+
+API_URL = "http://localhost:8080/data"
+# Si usas Railway, cambia por:
+# API_URL = "https://tu-app.railway.app/data"
+
+# =========================
+# CONEXIÓN
 # =========================
 
 try:
-    data = requests.get("https://bot-crypto-production.up.railway.app/data").json()
+    response = requests.get(API_URL, timeout=5)
+    data = response.json()
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
+    st.stop()
+
+# Validación extra
+if not isinstance(data, dict):
+    st.error("❌ Respuesta inválida del servidor")
     st.stop()
 
 capital = data.get("capital", 0)
@@ -21,90 +34,96 @@ posiciones = data.get("posiciones", {})
 historial = data.get("historial", [])
 
 # =========================
-# KPIs PRINCIPALES
+# KPIs
 # =========================
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("💰 Capital", f"${round(capital,2)}")
-col2.metric("📊 Posiciones abiertas", len(posiciones))
-col3.metric("📈 Total operaciones", len(historial))
+col1.metric("💰 Capital", f"${round(float(capital),2)}")
+col2.metric("📊 Posiciones", len(posiciones))
+col3.metric("📈 Trades", len(historial))
 
 # =========================
-# POSICIONES ACTIVAS (FIX PRO)
+# POSICIONES (100% SAFE)
 # =========================
 
 st.subheader("📊 Posiciones activas")
 
-if posiciones:
-    filas = []
+try:
+    filas_pos = []
 
-    for symbol, data_pos in posiciones.items():
-        fila = {
-            "Symbol": symbol,
-            "Inversión ($)": round(data_pos.get("inversion", 0), 2),
-            "Precio entrada": round(data_pos.get("entry", 0), 2)
-        }
-        filas.append(fila)
+    if isinstance(posiciones, dict):
+        for symbol, p in posiciones.items():
+            if isinstance(p, dict):
+                filas_pos.append({
+                    "Symbol": symbol,
+                    "Inversión": float(p.get("inversion", 0)),
+                    "Entry": float(p.get("entry", 0))
+                })
 
-    df_pos = pd.DataFrame(filas)
-    st.dataframe(df_pos, use_container_width=True)
+    if filas_pos:
+        df_pos = pd.DataFrame(filas_pos)
+        st.dataframe(df_pos, use_container_width=True)
+    else:
+        st.info("No hay posiciones abiertas")
 
-else:
-    st.info("No hay posiciones abiertas")
+except Exception as e:
+    st.error(f"Error en posiciones: {e}")
 
 # =========================
-# HISTORIAL DE OPERACIONES (FIX PRO)
+# HISTORIAL (100% SAFE)
 # =========================
 
 st.subheader("📜 Historial de operaciones")
 
-if historial:
-    df_hist = pd.DataFrame(historial)
+try:
+    filas_hist = []
 
-    # ordenar columnas de forma segura
-    columnas = ["symbol", "tipo", "capital", "probabilidad"]
-    columnas_presentes = [c for c in columnas if c in df_hist.columns]
+    if isinstance(historial, list):
+        for h in historial:
+            if isinstance(h, dict):
+                filas_hist.append({
+                    "Symbol": h.get("symbol"),
+                    "Tipo": h.get("tipo"),
+                    "Capital": float(h.get("capital", 0)),
+                    "Probabilidad": h.get("probabilidad")
+                })
 
-    df_hist = df_hist[columnas_presentes]
+    if filas_hist:
+        df_hist = pd.DataFrame(filas_hist)
+        st.dataframe(df_hist, use_container_width=True)
+    else:
+        st.info("Sin operaciones aún")
 
-    st.dataframe(df_hist, use_container_width=True)
-
-else:
-    st.info("Sin operaciones aún")
+except Exception as e:
+    st.error(f"Error en historial: {e}")
 
 # =========================
-# EQUITY CURVE (SIMULADA)
+# EQUITY CURVE
 # =========================
 
 st.subheader("📈 Evolución del capital")
 
-if historial:
+try:
     equity = []
-    capital_temp = 1000  # capital inicial
 
-    for trade in historial:
-        # solo aplicar pnl si es venta (luego lo mejoramos)
-        if trade.get("tipo") == "SELL":
-            capital_temp = trade.get("capital", capital_temp)
+    if isinstance(historial, list):
+        for h in historial:
+            if isinstance(h, dict) and h.get("tipo") == "SELL":
+                equity.append(float(h.get("capital", 0)))
 
-        equity.append(capital_temp)
+    if equity:
+        df_equity = pd.DataFrame({"Capital": equity})
+        st.line_chart(df_equity)
+    else:
+        st.info("No hay suficientes datos de ventas")
 
-    df_equity = pd.DataFrame({"Capital": equity})
-    st.line_chart(df_equity)
-
-else:
-    st.info("No hay datos suficientes para graficar")
+except Exception as e:
+    st.error(f"Error en equity: {e}")
 
 # =========================
-# INFO EXTRA
+# DEBUG (CLAVE)
 # =========================
 
-st.markdown("---")
-st.subheader("🧠 Estado del sistema")
-
-st.write(f"Capital actual: ${round(capital,2)}")
-st.write(f"Posiciones abiertas: {len(posiciones)}")
-st.write(f"Historial operaciones: {len(historial)}")
-
-st.markdown("✅ Sistema operativo en modo institucional")
+with st.expander("🛠 Ver datos crudos"):
+    st.json(data)
