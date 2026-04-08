@@ -1,32 +1,27 @@
-# =========================
-# CONFIG INSTITUCIONAL PRO FINAL
-# =========================
+# CONFIGURACIÓN INSTITUCIONAL PRO
 
 CAPITAL_INICIAL = 1000
 
 # Riesgo
-RIESGO_POR_TRADE = 0.02
+RIESGO_MAXIMO_POR_TRADE = 0.30  # solo para señales top
+RIESGO_MEDIO = 0.20
+RIESGO_BAJO = 0.15
+
+# Filtro institucional
+PROB_MINIMA = 0.7
+
+# Máximo de posiciones
 MAX_POSICIONES = 4
-MAX_EXPOSICION_TOTAL = 0.6
 
-# Allocation dinámico
-PESO_EXCELENTE = 0.30
-PESO_BUENO_MIN = 0.15
-PESO_BUENO_MAX = 0.20
+# Cooldown base (segundos)
+COOLDOWN_BASE = 120
 
-# Filtros
-UMBRAL_COMPRA = 0.80
-UMBRAL_EXCELENTE = 1.0
-MIN_SCORE = 3
+# Stop loss y take profit
+STOP_LOSS = -0.03
+TAKE_PROFIT = 0.04
 
-# Gestión
-STOP_LOSS = -0.025
-TAKE_PROFIT = 0.06
-
-# Control
-COOLDOWN = 5
-MAX_ENTRADAS_POR_CICLO = 2
-
-# Capital
+# Capital mínimo para operar
 MIN_CAPITAL_OPERAR = 50
-RESERVA_CAPITAL = 0.40
+
+# Reserva de capital
+RESERVA_CAPITAL = 0.1  # 10%
