@@ -1,6 +1,6 @@
 import config
-import random
 import time
+import random
 
 class Portfolio:
 
@@ -9,17 +9,17 @@ class Portfolio:
         self.capital = config.CAPITAL_INICIAL * config.USO_CAPITAL
         self.posiciones = {}
         self.historial = []
-        self.last_trade_time = 0
+        self.last_trade = 0
 
-        print(f"🚀 Capital inicial: {self.capital_total}")
+        print("🚀 BOT INSTITUCIONAL INICIADO")
 
     # =========================
-    # CORRELACIÓN
+    # CORRELACIÓN REAL
     # =========================
 
     def grupo(self, symbol):
-        for g, activos in config.CORRELACION_GRUPOS.items():
-            if symbol in activos:
+        for g, lista in config.CORRELACION.items():
+            if symbol in lista:
                 return g
         return None
 
@@ -31,15 +31,14 @@ class Portfolio:
         return False
 
     # =========================
-    # COOLDOWN DINÁMICO
+    # CONTROL OPERATIVO
     # =========================
 
     def puede_operar(self):
-        ahora = time.time()
-        return (ahora - self.last_trade_time) > config.COOLDOWN_BASE
+        return (time.time() - self.last_trade) > config.COOLDOWN
 
     # =========================
-    # COMPRA INSTITUCIONAL
+    # COMPRA INTELIGENTE
     # =========================
 
     def comprar(self, symbol, precio, prob):
@@ -56,12 +55,14 @@ class Portfolio:
         if self.correlacion(symbol):
             return
 
-        # calidad de señal
+        # Clasificación
         if prob >= config.UMBRAL_EXCELENTE:
             size = config.SIZE_EXCELENTE
+            tipo = "excelente"
 
         elif prob >= config.UMBRAL_BUENO:
             size = random.uniform(config.SIZE_BUENO_MIN, config.SIZE_BUENO_MAX)
+            tipo = "bueno"
 
         else:
             return
@@ -80,35 +81,33 @@ class Portfolio:
             "cantidad": cantidad,
             "inversion": capital_trade,
             "max_precio": precio,
+            "tipo": tipo,
+            "prob": prob,
             "trailing": False
         }
 
-        self.last_trade_time = time.time()
+        self.last_trade = time.time()
 
-        print(f"🟢 BUY {symbol} | ${capital_trade:.2f} | prob: {prob:.2f}")
+        print(f"🟢 BUY {symbol} | ${capital_trade:.2f} | {tipo} | prob: {prob:.2f}")
 
     # =========================
-    # GESTIÓN DINÁMICA
+    # GESTIÓN
     # =========================
 
     def evaluar(self, precios):
 
         for symbol in list(self.posiciones.keys()):
 
-            if symbol not in precios:
-                continue
-
             pos = self.posiciones[symbol]
-
             precio = precios[symbol]
+
             pnl = (precio - pos["precio"]) / pos["precio"]
 
-            # actualizar máximo
             if precio > pos["max_precio"]:
                 pos["max_precio"] = precio
 
             # activar trailing
-            if pnl >= config.TRAILING_START:
+            if pnl > config.TRAILING_START:
                 pos["trailing"] = True
 
             # stop loss
@@ -136,27 +135,28 @@ class Portfolio:
 
         trade = {
             "symbol": symbol,
+            "tipo": pos["tipo"],
+            "prob": round(pos["prob"], 2),
             "pnl": round(pnl, 4),
             "capital": round(self.capital, 2)
         }
 
         self.historial.append(trade)
 
-        print(f"💰 SELL {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
+        print(f"💰 SELL {symbol} | pnl: {pnl:.4f}")
 
         del self.posiciones[symbol]
 
     # =========================
-    # DATA LIMPIA STREAMLIT
+    # DATA STREAMLIT CORRECTA
     # =========================
 
     def data(self):
 
         return {
-            "capital": float(round(self.capital, 2)),
-            "capital_total": float(self.capital_total),
-            "num_posiciones": int(len(self.posiciones)),
+            "capital": round(self.capital, 2),
             "posiciones": list(self.posiciones.keys()),
-            "trades": int(len(self.historial)),
-            "historial": list(self.historial)
+            "num_posiciones": len(self.posiciones),
+            "trades": len(self.historial),
+            "historial": self.historial[-20:]
         }
