@@ -4,37 +4,35 @@ import time
 class Portfolio:
 
     def __init__(self):
-        self.capital_total = config.CAPITAL_INICIAL
-        self.capital = config.CAPITAL_INICIAL * config.USO_CAPITAL
+        self.capital_inicial = config.CAPITAL_INICIAL
+        self.capital = config.CAPITAL_INICIAL
         self.posiciones = {}
         self.historial = []
         self.last_trade = 0
-        self.peak = self.capital
 
-        print(f"🚀 Capital inicial: {self.capital_total}")
-
-    # =========================
-    # COOLDOWN DINÁMICO
-    # =========================
-    def cooldown(self, volatilidad):
-
-        if volatilidad > 0.04:
-            return config.COOLDOWN_BASE * 2
-
-        elif volatilidad < 0.015:
-            return config.COOLDOWN_BASE * 0.7
-
-        return config.COOLDOWN_BASE
-
-    def puede_operar(self, volatilidad):
-        return (time.time() - self.last_trade) > self.cooldown(volatilidad)
+        print(f"🚀 Capital inicial: {self.capital}")
 
     # =========================
-    # COMPRA
+    # EXPOSICIÓN TOTAL
     # =========================
-    def comprar(self, symbol, precio, prob, volatilidad):
+    def capital_invertido(self):
+        return sum([p["inversion"] for p in self.posiciones.values()])
 
-        if not self.puede_operar(volatilidad):
+    def exposicion_actual(self):
+        return self.capital_invertido() / self.capital_inicial
+
+    # =========================
+    # COOLDOWN (base)
+    # =========================
+    def puede_operar(self):
+        return (time.time() - self.last_trade) > config.COOLDOWN_BASE
+
+    # =========================
+    # BUY (CONTROL INSTITUCIONAL)
+    # =========================
+    def comprar(self, symbol, precio, prob, vol):
+
+        if not self.puede_operar():
             return False
 
         if symbol in self.posiciones:
@@ -43,24 +41,31 @@ class Portfolio:
         if len(self.posiciones) >= config.MAX_POSICIONES:
             return False
 
-        # sizing institucional
-        if prob >= config.UMBRAL_EXCELENTE:
-            size = config.SIZE_EXCELENTE
-            tipo = "excelente"
+        # 🚨 CONTROL GLOBAL (CLAVE)
+        if self.exposicion_actual() >= config.USO_CAPITAL:
+            return False
 
-        elif prob >= config.UMBRAL_BUENO:
-            size = config.SIZE_BUENO_MIN
-            tipo = "bueno"
-
+        # =========================
+        # SIZE POR CONVICCIÓN
+        # =========================
+        if prob >= 0.9:
+            size = 0.30
+        elif prob >= 0.75:
+            size = 0.18
         else:
             return False
 
-        capital_trade = self.capital * size
+        capital_trade = self.capital_inicial * size
+
+        # 🚨 evitar sobrepasar 60%
+        if self.capital_invertido() + capital_trade > self.capital_inicial * config.USO_CAPITAL:
+            return False
 
         if capital_trade < config.MIN_TRADE_USD:
             return False
 
         cantidad = capital_trade / precio
+
         self.capital -= capital_trade
 
         self.posiciones[symbol] = {
@@ -68,9 +73,7 @@ class Portfolio:
             "cantidad": cantidad,
             "inversion": capital_trade,
             "max_precio": precio,
-            "tipo": tipo,
             "prob": prob,
-            "vol": volatilidad,
             "trailing": False
         }
 
@@ -81,14 +84,19 @@ class Portfolio:
         return True
 
     # =========================
-    # SALIDA INTELIGENTE
+    # EVALUAR
     # =========================
     def evaluar(self, symbol, precio):
 
+        if symbol not in self.posiciones:
+            return False
+
         pos = self.posiciones[symbol]
 
-        pnl = (precio - pos["entry"]) / pos["entry"]
+        entry = pos["entry"]
+        pnl = (precio - entry) / entry
 
+        # actualizar máximo
         if precio > pos["max_precio"]:
             pos["max_precio"] = precio
 
@@ -96,46 +104,53 @@ class Portfolio:
         if pnl > config.TRAILING_START:
             pos["trailing"] = True
 
-        # trailing adaptativo
-        gap = config.TRAILING_GAP_BASE + pos["vol"]
+        # STOP LOSS
+        if pnl <= config.STOP_LOSS:
+            self.cerrar(symbol, precio, pnl)
+            return True
+
+        # TRAILING DINÁMICO (ligado a volatilidad)
+        trailing_gap = config.TRAILING_GAP_BASE * (1 + pos["prob"])
 
         if pos["trailing"]:
-            stop = pos["max_precio"] * (1 - gap)
+            stop = pos["max_precio"] * (1 - trailing_gap)
 
             if precio <= stop:
+                self.cerrar(symbol, precio, pnl)
                 return True
-
-        # stop loss
-        if pnl <= config.STOP_LOSS:
-            return True
 
         return False
 
-    def cerrar(self, symbol, precio):
+    # =========================
+    # SELL
+    # =========================
+    def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones[symbol]
 
         valor = pos["cantidad"] * precio
-        pnl = (precio - pos["entry"]) / pos["entry"]
-
         self.capital += valor
 
         self.historial.append({
             "symbol": symbol,
             "tipo": "SELL",
-            "pnl": pnl,
-            "capital": self.capital
+            "pnl": round(pnl, 4),
+            "capital": round(self.capital, 2)
         })
 
-        print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
+        print(f"🔴 SELL {symbol} | pnl: {pnl:.4f}")
 
         del self.posiciones[symbol]
 
+    # =========================
+    # DATA STREAMLIT
+    # =========================
     def data(self):
 
         return {
-            "capital": self.capital,
-            "capital_inicial": self.capital_total,
+            "capital": round(self.capital, 2),
+            "capital_inicial": self.capital_inicial,
+            "exposicion": round(self.exposicion_actual(), 2),
             "posiciones": self.posiciones,
-            "historial": self.historial
+            "historial": self.historial[-50]
         }
