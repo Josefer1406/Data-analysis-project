@@ -13,10 +13,6 @@ class Portfolio:
 
         print("🚀 BOT INSTITUCIONAL INICIADO")
 
-    # =========================
-    # CORRELACIÓN REAL
-    # =========================
-
     def grupo(self, symbol):
         for g, lista in config.CORRELACION.items():
             if symbol in lista:
@@ -30,16 +26,8 @@ class Portfolio:
                 return True
         return False
 
-    # =========================
-    # CONTROL OPERATIVO
-    # =========================
-
     def puede_operar(self):
         return (time.time() - self.last_trade) > config.COOLDOWN
-
-    # =========================
-    # COMPRA INTELIGENTE
-    # =========================
 
     def comprar(self, symbol, precio, prob):
 
@@ -55,7 +43,6 @@ class Portfolio:
         if self.correlacion(symbol):
             return
 
-        # Clasificación
         if prob >= config.UMBRAL_EXCELENTE:
             size = config.SIZE_EXCELENTE
             tipo = "excelente"
@@ -73,7 +60,6 @@ class Portfolio:
             return
 
         cantidad = capital_trade / precio
-
         self.capital -= capital_trade
 
         self.posiciones[symbol] = {
@@ -82,17 +68,13 @@ class Portfolio:
             "inversion": capital_trade,
             "max_precio": precio,
             "tipo": tipo,
-            "prob": prob,
+            "prob": float(prob),
             "trailing": False
         }
 
         self.last_trade = time.time()
 
         print(f"🟢 BUY {symbol} | ${capital_trade:.2f} | {tipo} | prob: {prob:.2f}")
-
-    # =========================
-    # GESTIÓN
-    # =========================
 
     def evaluar(self, precios):
 
@@ -106,25 +88,17 @@ class Portfolio:
             if precio > pos["max_precio"]:
                 pos["max_precio"] = precio
 
-            # activar trailing
             if pnl > config.TRAILING_START:
                 pos["trailing"] = True
 
-            # stop loss
             if pnl <= config.STOP_LOSS:
                 self.cerrar(symbol, precio, pnl)
                 continue
 
-            # trailing dinámico
             if pos["trailing"]:
                 stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
-
                 if precio <= stop:
                     self.cerrar(symbol, precio, pnl)
-
-    # =========================
-    # CIERRE
-    # =========================
 
     def cerrar(self, symbol, precio, pnl):
 
@@ -136,9 +110,9 @@ class Portfolio:
         trade = {
             "symbol": symbol,
             "tipo": pos["tipo"],
-            "prob": round(pos["prob"], 2),
-            "pnl": round(pnl, 4),
-            "capital": round(self.capital, 2)
+            "prob": float(pos["prob"]),
+            "pnl": float(round(pnl, 4)),
+            "capital": float(round(self.capital, 2))
         }
 
         self.historial.append(trade)
@@ -147,16 +121,17 @@ class Portfolio:
 
         del self.posiciones[symbol]
 
-    # =========================
-    # DATA STREAMLIT CORRECTA
-    # =========================
-
+    # 🔥 DATA COMPLETA PARA STREAMLIT
     def data(self):
 
         return {
             "capital": round(self.capital, 2),
-            "posiciones": list(self.posiciones.keys()),
+
+            "posiciones": self.posiciones,  # 🔥 AHORA COMPLETO
+
             "num_posiciones": len(self.posiciones),
+
             "trades": len(self.historial),
+
             "historial": self.historial[-20:]
         }
