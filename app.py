@@ -9,19 +9,19 @@ portfolio = Portfolio()
 
 def bot():
 
+    print("🚀 BOT INICIADO (única instancia)")
+
     while True:
 
-        print("\n🔎 Analizando mercado...")
-
         precios = {
-            "BTC/USDT": 64000 + random.uniform(-200, 200),
+            "BTC/USDT": 60000 + random.uniform(-300, 300),
             "ETH/USDT": 3400 + random.uniform(-50, 50),
-            "SOL/USDT": 145 + random.uniform(-5, 5),
+            "SOL/USDT": 150 + random.uniform(-5, 5),
             "ADA/USDT": 0.5 + random.uniform(-0.02, 0.02),
-            "XRP/USDT": 0.58 + random.uniform(-0.02, 0.02),
-            "AVAX/USDT": 38 + random.uniform(-2, 2),
-            "LINK/USDT": 19 + random.uniform(-1, 1),
-            "ATOM/USDT": 12 + random.uniform(-1, 1)
+            "XRP/USDT": 0.6 + random.uniform(-0.02, 0.02),
+            "AVAX/USDT": 35 + random.uniform(-2, 2),
+            "LINK/USDT": 18 + random.uniform(-1, 1),
+            "ATOM/USDT": 10 + random.uniform(-1, 1)
         }
 
         for s, p in precios.items():
@@ -32,7 +32,6 @@ def bot():
 
         print(f"💰 Capital: {portfolio.capital:.2f}")
         print(f"📊 Posiciones: {portfolio.posiciones}")
-        print("⏳ Ciclo completado...\n")
 
         time.sleep(10)
 
