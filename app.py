@@ -7,7 +7,7 @@ import portfolio
 from ml import model
 
 # =========================
-# CONFIG BOT
+# CONFIG
 # =========================
 
 UNIVERSO = [
@@ -17,7 +17,7 @@ UNIVERSO = [
 ]
 
 # =========================
-# ESTADO GLOBAL (para dashboard)
+# ESTADO GLOBAL
 # =========================
 
 historial_operaciones = []
@@ -27,7 +27,7 @@ historial_operaciones = []
 # =========================
 
 def run_bot():
-    print("🚀 BOT CUANT INSTITUCIONAL PRO (POSITION SIZING)")
+    print("🚀 BOT CUANT INSTITUCIONAL PRO (ESTABLE)")
 
     while True:
         print("\n🔎 Analizando mercado...")
@@ -42,7 +42,6 @@ def run_bot():
             if data["score"] >= config.MIN_SCORE:
                 señales.append(data)
 
-        # ordenar por mejor oportunidad
         señales.sort(key=lambda x: x["probabilidad"], reverse=True)
 
         entradas = 0
@@ -52,7 +51,8 @@ def run_bot():
                 break
 
             if portfolio.puede_comprar(s["symbol"]):
-                antes = portfolio.capital
+
+                capital_antes = portfolio.capital
 
                 portfolio.abrir_posicion(
                     s["symbol"],
@@ -60,15 +60,15 @@ def run_bot():
                     s["precio"]
                 )
 
-                despues = portfolio.capital
+                capital_despues = portfolio.capital
 
-                # registrar operación si hubo cambio real
-                if despues < antes:
+                # Registrar solo si realmente compró
+                if capital_despues < capital_antes:
                     historial_operaciones.append({
                         "symbol": s["symbol"],
                         "tipo": "BUY",
-                        "capital": despues,
-                        "probabilidad": s["probabilidad"]
+                        "capital": float(capital_despues),
+                        "probabilidad": float(s["probabilidad"])
                     })
 
                     entradas += 1
@@ -83,14 +83,14 @@ def run_bot():
 
         posiciones_despues = list(portfolio.posiciones.keys())
 
-        # detectar cierres
         cerradas = set(posiciones_antes) - set(posiciones_despues)
 
         for symbol in cerradas:
             historial_operaciones.append({
                 "symbol": symbol,
                 "tipo": "SELL",
-                "capital": portfolio.capital
+                "capital": float(portfolio.capital),
+                "probabilidad": None
             })
 
         portfolio.actualizar_cooldowns()
@@ -100,29 +100,47 @@ def run_bot():
         time.sleep(10)
 
 # =========================
-# FLASK API (STREAMLIT)
+# FLASK API
 # =========================
 
 app = Flask(__name__)
 
 @app.route("/data")
 def data():
-    return jsonify({
-        "capital": round(portfolio.capital, 2),
-        "posiciones": portfolio.posiciones,
-        "historial": historial_operaciones
-    })
+    try:
+        posiciones_limpias = {
+            str(k): {
+                "inversion": float(v.get("inversion", 0)),
+                "entry": float(v.get("entry", 0))
+            }
+            for k, v in portfolio.posiciones.items()
+        }
+
+        historial_limpio = []
+        for h in historial_operaciones:
+            historial_limpio.append({
+                "symbol": str(h.get("symbol", "")),
+                "tipo": str(h.get("tipo", "")),
+                "capital": float(h.get("capital", 0)),
+                "probabilidad": float(h["probabilidad"]) if h.get("probabilidad") is not None else None
+            })
+
+        return jsonify({
+            "capital": float(portfolio.capital),
+            "posiciones": posiciones_limpias,
+            "historial": historial_limpio
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 # =========================
-# START SERVICIOS
+# START
 # =========================
 
 def start_flask():
     app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
-    # iniciar bot en paralelo
     threading.Thread(target=run_bot, daemon=True).start()
-
-    # iniciar API
     start_flask()
