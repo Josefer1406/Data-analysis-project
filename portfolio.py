@@ -1,87 +1,81 @@
 import time
-import config
 
 class Portfolio:
     def __init__(self):
-        self.capital = config.CAPITAL_INICIAL
+        self.capital = 1000
         self.posiciones = {}
-        self.cooldowns = {}
+        self.historial = []
+        self.trades = 0
+        self.equity_curve = []
 
         print(f"🚀 Capital inicial: {self.capital}")
 
-    def cooldown_dinamico(self, prob):
-        if prob > 0.9:
-            return 30
-        elif prob > 0.8:
-            return 60
-        else:
-            return config.COOLDOWN_BASE
-
-    def puede_operar(self, symbol):
-        ahora = time.time()
-        return symbol not in self.cooldowns or ahora >= self.cooldowns[symbol]
-
-    def set_cooldown(self, symbol, prob):
-        self.cooldowns[symbol] = time.time() + self.cooldown_dinamico(prob)
-
-    def calcular_size(self, prob):
-        capital_disponible = self.capital * (1 - config.RESERVA_CAPITAL)
-
-        if prob > 0.9:
-            return capital_disponible * config.RIESGO_MAXIMO_POR_TRADE
-        elif prob > 0.8:
-            return capital_disponible * config.RIESGO_MEDIO
-        else:
-            return capital_disponible * config.RIESGO_BAJO
-
     def comprar(self, symbol, precio, prob):
-        if len(self.posiciones) >= config.MAX_POSICIONES:
-            return
-
-        if not self.puede_operar(symbol):
-            return
-
         if symbol in self.posiciones:
             return
 
-        size = self.calcular_size(prob)
+        if prob >= 0.85:
+            porcentaje = 0.30
+        elif prob >= 0.70:
+            porcentaje = 0.20
+        else:
+            porcentaje = 0.10
 
-        if size < config.MIN_CAPITAL_OPERAR:
+        monto = self.capital * porcentaje
+
+        if monto < 10:
             return
 
-        # ✅ CORRECTO: calcular cantidad
-        cantidad = size / precio
+        cantidad = monto / precio
+
+        self.capital -= monto
 
         self.posiciones[symbol] = {
-            "precio_entrada": precio,
-            "size": size,
-            "cantidad": cantidad
+            "precio": precio,
+            "cantidad": cantidad,
+            "timestamp": time.time()
         }
 
-        self.capital -= size
-        self.set_cooldown(symbol, prob)
+        print(f"🟢 BUY {symbol} | ${monto:.2f} | prob: {prob:.2f}")
 
-        print(f"🟢 BUY {symbol} | ${size:.2f} | cantidad: {cantidad:.6f} | prob: {prob:.2f}")
-
-    def vender(self, symbol, precio):
+    def vender(self, symbol, precio_actual):
         if symbol not in self.posiciones:
             return
 
         posicion = self.posiciones[symbol]
 
-        # ✅ valor real de la posición
-        valor_actual = posicion["cantidad"] * precio
-        pnl = (precio - posicion["precio_entrada"]) / posicion["precio_entrada"]
+        precio_entrada = posicion["precio"]
+        cantidad = posicion["cantidad"]
 
-        if pnl <= config.STOP_LOSS or pnl >= config.TAKE_PROFIT:
-            self.capital += valor_actual
+        pnl = (precio_actual - precio_entrada) / precio_entrada
 
-            print(f"💰 CERRAR {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
+        # TP / SL institucional
+        if pnl >= 0.04 or pnl <= -0.02:
+
+            valor = cantidad * precio_actual
+            self.capital += valor
+            self.trades += 1
+
+            trade = {
+                "symbol": symbol,
+                "entrada": precio_entrada,
+                "salida": precio_actual,
+                "pnl": pnl,
+                "timestamp": time.time()
+            }
+
+            self.historial.append(trade)
+            self.equity_curve.append(self.capital)
+
+            print(f"💰 SELL {symbol} | pnl: {pnl:.4f} | capital: {self.capital:.2f}")
 
             del self.posiciones[symbol]
 
     def estado(self):
         return {
-            "capital": round(self.capital, 2),
-            "posiciones": list(self.posiciones.keys())
+            "capital": self.capital,
+            "posiciones": list(self.posiciones.keys()),
+            "historial": self.historial[-20:],  # últimos trades
+            "trades": self.trades,
+            "equity_curve": self.equity_curve
         }
