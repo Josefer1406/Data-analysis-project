@@ -29,8 +29,8 @@ UMBRAL_BUENO = 0.75
 COOLDOWN_BASE = 20
 
 # 🔥 FILTRO DE MERCADO (CLAVE)
-VOLATILIDAD_LIMITE = 0.06   # máximo permitido
-VOLATILIDAD_MIN = 0.005     # mínimo para evitar mercado muerto
+VOLATILIDAD_LIMITE = 0.08   # máximo permitido
+VOLATILIDAD_MIN = 0.003     # mínimo para evitar mercado muerto
 
 # Universo
 CRYPTOS = [
