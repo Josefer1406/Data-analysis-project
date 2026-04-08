@@ -6,12 +6,10 @@ st.set_page_config(layout="wide")
 st.title("🚀 BOT CUANT INSTITUCIONAL PRO")
 
 # =========================
-# URL API (IMPORTANTE)
+# URL API (FIJA - PRODUCCIÓN)
 # =========================
 
 API_URL = "https://data-analysis-project-production.up.railway.app/data"
-# Si usas Railway, cambia por:
-# API_URL = "https://tu-app.railway.app/data"
 
 # =========================
 # CONEXIÓN
@@ -24,7 +22,7 @@ except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
 
-# Validación extra
+# Validación
 if not isinstance(data, dict):
     st.error("❌ Respuesta inválida del servidor")
     st.stop()
@@ -44,7 +42,7 @@ col2.metric("📊 Posiciones", len(posiciones))
 col3.metric("📈 Trades", len(historial))
 
 # =========================
-# POSICIONES (100% SAFE)
+# POSICIONES (SAFE)
 # =========================
 
 st.subheader("📊 Posiciones activas")
@@ -71,7 +69,7 @@ except Exception as e:
     st.error(f"Error en posiciones: {e}")
 
 # =========================
-# HISTORIAL (100% SAFE)
+# HISTORIAL (SAFE)
 # =========================
 
 st.subheader("📜 Historial de operaciones")
@@ -122,7 +120,7 @@ except Exception as e:
     st.error(f"Error en equity: {e}")
 
 # =========================
-# DEBUG (CLAVE)
+# DEBUG
 # =========================
 
 with st.expander("🛠 Ver datos crudos"):
