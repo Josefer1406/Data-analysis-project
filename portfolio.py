@@ -1,22 +1,16 @@
 import config
 import time
 import csv
-import os
 
 class Portfolio:
 
     def __init__(self):
         self.capital_inicial = config.CAPITAL_INICIAL
         self.capital = config.CAPITAL_INICIAL
-        self.peak_capital = self.capital
-
         self.posiciones = {}
         self.historial = []
-
         self.last_trade = 0
         self.cooldown = config.COOLDOWN_BASE
-
-        self.modo_defensivo = False
 
         print(f"🚀 Capital inicial: {self.capital_inicial}")
 
@@ -30,35 +24,12 @@ class Portfolio:
         return self.capital_invertido() / self.capital_inicial
 
     # =========================
-    # DRAWDOWN CONTROL (🔥 CLAVE)
-    # =========================
-    def actualizar_drawdown(self):
-
-        if self.capital > self.peak_capital:
-            self.peak_capital = self.capital
-
-        dd = (self.capital - self.peak_capital) / self.peak_capital
-
-        # 🔴 CORTE TOTAL
-        if dd < -0.25:
-            print("🛑 STOP TOTAL: drawdown crítico")
-            return False
-
-        # 🟡 MODO DEFENSIVO
-        if dd < -0.10:
-            self.modo_defensivo = True
-        else:
-            self.modo_defensivo = False
-
-        return True
-
-    # =========================
     # COOLDOWN DINÁMICO
     # =========================
     def actualizar_cooldown(self):
 
         if len(self.historial) < 5:
-            self.cooldown = 20
+            self.cooldown = 15
             return
 
         ultimos = self.historial[-5:]
@@ -92,12 +63,9 @@ class Portfolio:
         return False
 
     # =========================
-    # COMPRA INTELIGENTE
+    # COMPRA
     # =========================
     def comprar(self, symbol, precio, prob):
-
-        if not self.actualizar_drawdown():
-            return False
 
         if not self.puede_operar():
             return False
@@ -112,17 +80,13 @@ class Portfolio:
             print(f"⛔ Correlación evitada: {symbol}")
             return False
 
-        # 🔥 IA DE RIESGO
+        # SIZE
         if prob >= 0.9:
-            size = 0.30
+            size = 0.25
         elif prob >= 0.75:
-            size = 0.18
+            size = 0.15
         else:
             return False
-
-        # 🔴 MODO DEFENSIVO
-        if self.modo_defensivo:
-            size *= 0.5  # reduce riesgo
 
         capital_trade = self.capital_inicial * size
 
@@ -141,7 +105,9 @@ class Portfolio:
             "inversion": capital_trade,
             "max_precio": precio,
             "prob": prob,
-            "trailing": False
+            "trailing": False,
+            "break_even": False,
+            "tiempo": time.time()
         }
 
         self.last_trade = time.time()
@@ -151,7 +117,7 @@ class Portfolio:
         return True
 
     # =========================
-    # GESTIÓN POSICIONES
+    # GESTIÓN AVANZADA
     # =========================
     def actualizar(self, precios):
 
@@ -165,21 +131,59 @@ class Portfolio:
 
             pnl = (precio - pos["entry"]) / pos["entry"]
 
+            # actualizar máximo
             if precio > pos["max_precio"]:
                 pos["max_precio"] = precio
 
-            if pnl > config.TRAILING_START:
-                pos["trailing"] = True
-
-            if pnl <= config.STOP_LOSS:
+            # =========================
+            # 1. SALIDA POR DEBILIDAD
+            # =========================
+            if pnl < -0.01:
+                print(f"⚠️ Salida temprana {symbol}")
                 self.cerrar(symbol, precio, pnl)
                 continue
 
-            if pos["trailing"]:
-                stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
-                if precio <= stop:
-                    self.cerrar(symbol, precio, pnl)
+            # =========================
+            # 2. BREAK EVEN
+            # =========================
+            if pnl > 0.015:
+                pos["break_even"] = True
 
+            if pos["break_even"] and pnl <= 0:
+                print(f"🛡 Break-even {symbol}")
+                self.cerrar(symbol, precio, pnl)
+                continue
+
+            # =========================
+            # 3. TRAILING INTELIGENTE
+            # =========================
+            if pnl > config.TRAILING_START:
+                pos["trailing"] = True
+
+            if pos["trailing"]:
+                gap = config.TRAILING_GAP
+
+                # 🔥 más ganancia = trailing más apretado
+                if pnl > 0.05:
+                    gap = 0.01
+
+                stop = pos["max_precio"] * (1 - gap)
+
+                if precio <= stop:
+                    print(f"📉 Trailing stop {symbol}")
+                    self.cerrar(symbol, precio, pnl)
+                    continue
+
+            # =========================
+            # 4. STOP DURO (último recurso)
+            # =========================
+            if pnl <= config.STOP_LOSS:
+                print(f"🛑 Stop loss {symbol}")
+                self.cerrar(symbol, precio, pnl)
+
+    # =========================
+    # CIERRE
+    # =========================
     def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones[symbol]
@@ -187,13 +191,14 @@ class Portfolio:
         valor = pos["cantidad"] * precio
         self.capital += valor
 
-        self.historial.append({
+        trade = {
             "symbol": symbol,
-            "pnl": pnl,
-            "capital": self.capital,
-            "tipo": "SELL",
-            "timestamp": time.time()
-        })
+            "pnl": float(round(pnl, 4)),
+            "capital": float(round(self.capital, 2)),
+            "tipo": "SELL"
+        }
+
+        self.historial.append(trade)
 
         print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
 
@@ -205,48 +210,55 @@ class Portfolio:
     def resumen_performance(self):
 
         total = len(self.historial)
+
         wins = sum(1 for t in self.historial if t["pnl"] > 0)
 
-        winrate = (wins / total) if total > 0 else 0
+        winrate = round(wins / total, 2) if total > 0 else 0
 
-        pnl = self.capital - self.capital_inicial
+        capital_final = round(self.capital, 2)
+        pnl = round(capital_final - self.capital_inicial, 2)
+
+        pnl_pct = round((pnl / self.capital_inicial) * 100, 2)
 
         return {
-            "capital": self.capital,
+            "capital_final": capital_final,
             "pnl": pnl,
-            "winrate": round(winrate, 2),
-            "trades": total
+            "pnl_pct": pnl_pct,
+            "trades": total,
+            "winrate": winrate
         }
 
     # =========================
-    # GUARDADO
+    # GUARDAR
     # =========================
     def guardar_resultados(self):
 
-        archivo = "resultados_bot.csv"
         data = self.resumen_performance()
 
-        existe = os.path.isfile(archivo)
-
-        with open(archivo, "a", newline="") as f:
-
+        with open("resultados_bot.csv", "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=data.keys())
 
-            if not existe:
+            if f.tell() == 0:
                 writer.writeheader()
 
             writer.writerow(data)
 
     # =========================
-    # DATA API
+    # STREAMLIT
     # =========================
     def data(self):
+
+        capital_actual = round(self.capital, 2)
+        pnl = round(capital_actual - self.capital_inicial, 2)
+        pnl_pct = round((pnl / self.capital_inicial) * 100, 2)
+
         return {
-            "capital": self.capital,
+            "capital": capital_actual,
             "capital_inicial": self.capital_inicial,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
             "posiciones": self.posiciones,
-            "historial": self.historial,
-            "modo_defensivo": self.modo_defensivo
+            "historial": self.historial
         }
 
 
