@@ -17,7 +17,7 @@ def score_institucional(asset):
     prob = asset["prob"]
     score = asset["score"]
 
-    s = (prob * 0.6) + ((score / 3) * 0.4)
+    s = (prob * 0.6) + ((score / 4) * 0.4)
 
     if prob > 0.9:
         s += 0.1
@@ -26,18 +26,18 @@ def score_institucional(asset):
 
 
 # =========================
-# FILTRO DINÁMICO PRO
+# CLASIFICACIÓN
 # =========================
 def clasificar_trade(asset):
 
     prob = asset["prob"]
     score = asset["score"]
 
-    # 🔥 ELITE
+    # ELITE
     if prob >= 0.80 and score >= 2:
         return "elite"
 
-    # 🔥 OPORTUNISTA (mercado lento)
+    # OPORTUNISTA
     if prob >= 0.70 and score >= 1:
         return "oportunista"
 
@@ -45,11 +45,11 @@ def clasificar_trade(asset):
 
 
 # =========================
-# BOT
+# BOT PRINCIPAL
 # =========================
 def bot():
 
-    print("🚀 BOT HEDGE FUND ADAPTATIVO INICIADO")
+    print("🚀 BOT HEDGE FUND CON ROTACIÓN INICIADO")
 
     contador = 0
 
@@ -88,7 +88,7 @@ def bot():
                     oportunistas.append(data)
 
             # =========================
-            # ACTUALIZAR PORTAFOLIO
+            # ACTUALIZAR POSICIONES
             # =========================
             portfolio.actualizar(precios)
 
@@ -98,50 +98,64 @@ def bot():
             elite = sorted(elite, key=lambda x: x["score_final"], reverse=True)
             oportunistas = sorted(oportunistas, key=lambda x: x["score_final"], reverse=True)
 
+            # =========================
+            # CAPACIDAD
+            # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
-            if espacios <= 0:
-                print("📊 Portafolio lleno")
-                time.sleep(config.CYCLE_TIME)
-                continue
+            # =========================
+            # SELECCIÓN BASE
+            # =========================
+            if espacios > 0:
+                seleccion = elite[:espacios]
 
-            # =========================
-            # PRIORIDAD: ELITE
-            # =========================
-            seleccion = elite[:espacios]
+                if not seleccion:
+                    print("⚠️ Usando trades oportunistas")
+                    seleccion = oportunistas[:espacios]
 
-            # =========================
-            # SI NO HAY ELITE → USAR OPORTUNISTAS
-            # =========================
-            if not seleccion:
-                print("⚠️ Usando trades oportunistas")
-                seleccion = oportunistas[:espacios]
+            else:
+                # 🔥 PORTAFOLIO LLENO → activar rotación
+                print("🔁 Evaluando rotación...")
 
-            if not seleccion:
-                print("⛔ NO TRADE (ni elite ni oportunistas)")
-                time.sleep(config.CYCLE_TIME)
-                continue
+                # tomar mejor candidato disponible
+                candidatos = elite if elite else oportunistas
+
+                if not candidatos:
+                    print("⛔ No hay candidatos para rotar")
+                    time.sleep(config.CYCLE_TIME)
+                    continue
+
+                seleccion = [candidatos[0]]  # solo el mejor
 
             # =========================
             # EJECUCIÓN
             # =========================
+            ejecutados = 0
+
             for asset in seleccion:
 
                 ejecutado = portfolio.comprar(
                     asset["symbol"],
                     asset["precio"],
-                    asset["prob"]
+                    asset["prob"],
+                    asset["score_final"],
+                    precios
                 )
 
                 if ejecutado:
+                    ejecutados += 1
                     print(
                         f"🟢 TRADE: {asset['symbol']} | "
                         f"{'ELITE' if asset in elite else 'OPORTUNISTA'} | "
-                        f"prob {round(asset['prob'],2)}"
+                        f"prob {round(asset['prob'],2)} | "
+                        f"score {round(asset['score_final'],2)}"
                     )
 
+            if ejecutados == 0:
+                print("⛔ Ningún trade ejecutado")
+
             # =========================
-            # COOLDOWN DINÁMICO
+            # COOLDOWN
             # =========================
             portfolio.actualizar_cooldown()
 
@@ -149,7 +163,11 @@ def bot():
             # GUARDADO
             # =========================
             if contador % 20 == 0:
-                portfolio.guardar_resultados()
+                try:
+                    portfolio.guardar_resultados()
+                    print("💾 Resultados guardados")
+                except Exception as e:
+                    print(f"⚠️ Error guardando: {e}")
 
             # =========================
             # LOGS
@@ -158,6 +176,7 @@ def bot():
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"🔥 Elite: {len(elite)} | Oportunistas: {len(oportunistas)}")
             print(f"⏱ Cooldown: {portfolio.cooldown}s")
+            print(f"📈 Trades totales: {len(portfolio.historial)}")
 
             time.sleep(config.CYCLE_TIME)
 
@@ -166,11 +185,17 @@ def bot():
             time.sleep(5)
 
 
+# =========================
+# API
+# =========================
 @app.route("/data")
 def data():
     return jsonify(portfolio.data())
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
     threading.Thread(target=bot).start()
     app.run(host="0.0.0.0", port=8080)
