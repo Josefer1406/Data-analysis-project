@@ -17,7 +17,7 @@ CYCLE_TIME = 15
 # Riesgo
 STOP_LOSS = -0.02
 
-# Trailing institucional
+# Trailing
 TRAILING_START = 0.02
 TRAILING_GAP = 0.015
 
@@ -28,22 +28,30 @@ UMBRAL_BUENO = 0.75
 # Cooldown
 COOLDOWN_BASE = 20
 
-# 🔥 FILTRO DE MERCADO (CLAVE)
-VOLATILIDAD_LIMITE = 0.08   # máximo permitido
-VOLATILIDAD_MIN = 0.003     # mínimo para evitar mercado muerto
+# Volatilidad
+VOLATILIDAD_LIMITE = 0.10
+VOLATILIDAD_MIN = 0.003
 
-# Universo
+# ==============================
+# 🔥 UNIVERSO AMPLIO
+# ==============================
 CRYPTOS = [
-    "BTC/USDT", "ETH/USDT",
-    "SOL/USDT", "AVAX/USDT",
-    "ADA/USDT", "XRP/USDT",
-    "LINK/USDT", "ATOM/USDT"
+    "BTC/USDT","ETH/USDT",
+    "SOL/USDT","AVAX/USDT","ADA/USDT",
+    "LINK/USDT","ATOM/USDT",
+    "INJ/USDT","NEAR/USDT","APT/USDT",
+    "OP/USDT","RNDR/USDT","AR/USDT",
+    "MATIC/USDT","XRP/USDT"
 ]
 
-# Correlación
+# ==============================
+# CORRELACIÓN
+# ==============================
 CORRELACION = {
     "L1": ["BTC/USDT", "ETH/USDT"],
     "L2": ["SOL/USDT", "AVAX/USDT"],
-    "L3": ["ADA/USDT", "XRP/USDT"],
-    "L4": ["LINK/USDT", "ATOM/USDT"]
+    "L3": ["ADA/USDT", "XRP/USDT", "MATIC/USDT"],
+    "L4": ["LINK/USDT", "ATOM/USDT"],
+    "L5": ["INJ/USDT", "NEAR/USDT", "APT/USDT"],
+    "L6": ["OP/USDT", "AR/USDT", "RNDR/USDT"]
 }
