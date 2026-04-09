@@ -24,7 +24,7 @@ class Portfolio:
         return self.capital_invertido() / self.capital_inicial
 
     # =========================
-    # COOLDOWN DINÁMICO
+    # COOLDOWN
     # =========================
     def actualizar_cooldown(self):
 
@@ -63,9 +63,34 @@ class Portfolio:
         return False
 
     # =========================
-    # COMPRA
+    # PEOR POSICIÓN (🔥 NUEVO)
     # =========================
-    def comprar(self, symbol, precio, prob):
+    def peor_posicion(self, precios):
+
+        peor_symbol = None
+        peor_score = 999
+
+        for symbol, pos in self.posiciones.items():
+
+            precio = precios.get(symbol)
+            if precio is None:
+                continue
+
+            pnl = (precio - pos["entry"]) / pos["entry"]
+
+            # score negativo → peor
+            score = pnl
+
+            if score < peor_score:
+                peor_score = score
+                peor_symbol = symbol
+
+        return peor_symbol, peor_score
+
+    # =========================
+    # COMPRA CON ROTACIÓN
+    # =========================
+    def comprar(self, symbol, precio, prob, score_nuevo=None, precios=None):
 
         if not self.puede_operar():
             return False
@@ -73,9 +98,30 @@ class Portfolio:
         if symbol in self.posiciones:
             return False
 
+        # =========================
+        # ROTACIÓN SI ESTÁ LLENO
+        # =========================
         if len(self.posiciones) >= config.MAX_POSICIONES:
-            return False
 
+            if precios is None or score_nuevo is None:
+                return False
+
+            peor_symbol, peor_score = self.peor_posicion(precios)
+
+            # 🔥 solo rotar si el nuevo es mejor
+            if peor_score >= 0:
+                return False
+
+            if prob < 0.80:
+                return False
+
+            print(f"🔁 ROTANDO: sale {peor_symbol} → entra {symbol}")
+
+            self.cerrar(peor_symbol, precios[peor_symbol], peor_score)
+
+        # =========================
+        # FILTROS
+        # =========================
         if self.correlacionado(symbol):
             print(f"⛔ Correlación evitada: {symbol}")
             return False
@@ -117,7 +163,7 @@ class Portfolio:
         return True
 
     # =========================
-    # GESTIÓN AVANZADA
+    # GESTIÓN
     # =========================
     def actualizar(self, precios):
 
@@ -131,54 +177,40 @@ class Portfolio:
 
             pnl = (precio - pos["entry"]) / pos["entry"]
 
-            # actualizar máximo
             if precio > pos["max_precio"]:
                 pos["max_precio"] = precio
 
-            # =========================
-            # 1. SALIDA POR DEBILIDAD
-            # =========================
+            # salida temprana
             if pnl < -0.01:
-                print(f"⚠️ Salida temprana {symbol}")
                 self.cerrar(symbol, precio, pnl)
                 continue
 
-            # =========================
-            # 2. BREAK EVEN
-            # =========================
+            # break even
             if pnl > 0.015:
                 pos["break_even"] = True
 
             if pos["break_even"] and pnl <= 0:
-                print(f"🛡 Break-even {symbol}")
                 self.cerrar(symbol, precio, pnl)
                 continue
 
-            # =========================
-            # 3. TRAILING INTELIGENTE
-            # =========================
+            # trailing
             if pnl > config.TRAILING_START:
                 pos["trailing"] = True
 
             if pos["trailing"]:
                 gap = config.TRAILING_GAP
 
-                # 🔥 más ganancia = trailing más apretado
                 if pnl > 0.05:
                     gap = 0.01
 
                 stop = pos["max_precio"] * (1 - gap)
 
                 if precio <= stop:
-                    print(f"📉 Trailing stop {symbol}")
                     self.cerrar(symbol, precio, pnl)
                     continue
 
-            # =========================
-            # 4. STOP DURO (último recurso)
-            # =========================
+            # stop duro
             if pnl <= config.STOP_LOSS:
-                print(f"🛑 Stop loss {symbol}")
                 self.cerrar(symbol, precio, pnl)
 
     # =========================
@@ -205,46 +237,7 @@ class Portfolio:
         del self.posiciones[symbol]
 
     # =========================
-    # PERFORMANCE
-    # =========================
-    def resumen_performance(self):
-
-        total = len(self.historial)
-
-        wins = sum(1 for t in self.historial if t["pnl"] > 0)
-
-        winrate = round(wins / total, 2) if total > 0 else 0
-
-        capital_final = round(self.capital, 2)
-        pnl = round(capital_final - self.capital_inicial, 2)
-
-        pnl_pct = round((pnl / self.capital_inicial) * 100, 2)
-
-        return {
-            "capital_final": capital_final,
-            "pnl": pnl,
-            "pnl_pct": pnl_pct,
-            "trades": total,
-            "winrate": winrate
-        }
-
-    # =========================
-    # GUARDAR
-    # =========================
-    def guardar_resultados(self):
-
-        data = self.resumen_performance()
-
-        with open("resultados_bot.csv", "a", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=data.keys())
-
-            if f.tell() == 0:
-                writer.writeheader()
-
-            writer.writerow(data)
-
-    # =========================
-    # STREAMLIT
+    # DATA
     # =========================
     def data(self):
 
