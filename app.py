@@ -10,14 +10,14 @@ app = Flask(__name__)
 
 
 # =========================
-# SCORING INSTITUCIONAL
+# SCORING
 # =========================
 def score_institucional(asset):
 
     prob = asset["prob"]
     score = asset["score"]
 
-    s = (prob * 0.6) + ((score / 4) * 0.4)
+    s = (prob * 0.6) + ((score / 3) * 0.4)
 
     if prob > 0.9:
         s += 0.1
@@ -33,11 +33,9 @@ def clasificar_trade(asset):
     prob = asset["prob"]
     score = asset["score"]
 
-    # ELITE
     if prob >= 0.80 and score >= 2:
         return "elite"
 
-    # OPORTUNISTA
     if prob >= 0.70 and score >= 1:
         return "oportunista"
 
@@ -45,11 +43,11 @@ def clasificar_trade(asset):
 
 
 # =========================
-# BOT PRINCIPAL
+# BOT
 # =========================
 def bot():
 
-    print("🚀 BOT HEDGE FUND CON ROTACIÓN INICIADO")
+    print("🚀 BOT HEDGE FUND UNIVERSO DINÁMICO")
 
     contador = 0
 
@@ -59,12 +57,11 @@ def bot():
 
             print("\n🔎 Analizando mercado...")
 
-            elite = []
-            oportunistas = []
+            ranking_total = []
             precios = {}
 
             # =========================
-            # SCAN
+            # SCAN GLOBAL
             # =========================
             for symbol in config.CRYPTOS:
 
@@ -82,21 +79,34 @@ def bot():
 
                 data["score_final"] = score_institucional(data)
 
-                if tipo == "elite":
-                    elite.append(data)
-                else:
-                    oportunistas.append(data)
+                ranking_total.append(data)
 
             # =========================
             # ACTUALIZAR POSICIONES
             # =========================
             portfolio.actualizar(precios)
 
+            if not ranking_total:
+                print("⛔ No hay activos válidos")
+                time.sleep(config.CYCLE_TIME)
+                continue
+
             # =========================
-            # ORDENAR
+            # 🔥 UNIVERSO DINÁMICO
             # =========================
-            elite = sorted(elite, key=lambda x: x["score_final"], reverse=True)
-            oportunistas = sorted(oportunistas, key=lambda x: x["score_final"], reverse=True)
+            ranking_total = sorted(
+                ranking_total,
+                key=lambda x: x["score_final"],
+                reverse=True
+            )
+
+            universo = ranking_total[:8]  # 🔥 SOLO LOS MEJORES
+
+            # =========================
+            # DIVIDIR
+            # =========================
+            elite = [a for a in universo if clasificar_trade(a) == "elite"]
+            oportunistas = [a for a in universo if clasificar_trade(a) == "oportunista"]
 
             # =========================
             # CAPACIDAD
@@ -104,28 +114,27 @@ def bot():
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
             # =========================
-            # SELECCIÓN BASE
+            # SELECCIÓN
             # =========================
             if espacios > 0:
+
                 seleccion = elite[:espacios]
 
                 if not seleccion:
-                    print("⚠️ Usando trades oportunistas")
+                    print("⚠️ Usando oportunistas")
                     seleccion = oportunistas[:espacios]
 
             else:
-                # 🔥 PORTAFOLIO LLENO → activar rotación
                 print("🔁 Evaluando rotación...")
 
-                # tomar mejor candidato disponible
                 candidatos = elite if elite else oportunistas
 
                 if not candidatos:
-                    print("⛔ No hay candidatos para rotar")
+                    print("⛔ Sin candidatos para rotar")
                     time.sleep(config.CYCLE_TIME)
                     continue
 
-                seleccion = [candidatos[0]]  # solo el mejor
+                seleccion = [candidatos[0]]
 
             # =========================
             # EJECUCIÓN
@@ -146,13 +155,12 @@ def bot():
                     ejecutados += 1
                     print(
                         f"🟢 TRADE: {asset['symbol']} | "
-                        f"{'ELITE' if asset in elite else 'OPORTUNISTA'} | "
                         f"prob {round(asset['prob'],2)} | "
                         f"score {round(asset['score_final'],2)}"
                     )
 
             if ejecutados == 0:
-                print("⛔ Ningún trade ejecutado")
+                print("⛔ No se ejecutaron trades")
 
             # =========================
             # COOLDOWN
@@ -174,9 +182,9 @@ def bot():
             # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+            print(f"🌐 Universo activo: {len(universo)}")
             print(f"🔥 Elite: {len(elite)} | Oportunistas: {len(oportunistas)}")
             print(f"⏱ Cooldown: {portfolio.cooldown}s")
-            print(f"📈 Trades totales: {len(portfolio.historial)}")
 
             time.sleep(config.CYCLE_TIME)
 
@@ -185,17 +193,11 @@ def bot():
             time.sleep(5)
 
 
-# =========================
-# API
-# =========================
 @app.route("/data")
 def data():
     return jsonify(portfolio.data())
 
 
-# =========================
-# RUN
-# =========================
 if __name__ == "__main__":
     threading.Thread(target=bot).start()
     app.run(host="0.0.0.0", port=8080)
