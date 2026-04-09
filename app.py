@@ -28,11 +28,26 @@ def score_institucional(asset):
 
 
 # =========================
-# FILTRO ULTRA SELECTIVO
+# FILTRO DINÁMICO (🔥 CLAVE)
 # =========================
 def filtro_calidad(asset):
 
-    if asset["prob"] < 0.82:
+    # =========================
+    # FASE 1: EXPLORACIÓN (pocos trades)
+    # =========================
+    if len(portfolio.historial) < 10:
+        threshold = 0.75
+
+    # =========================
+    # FASE 2: PROTECCIÓN
+    # =========================
+    else:
+        threshold = 0.80
+
+    # =========================
+    # FILTROS BASE
+    # =========================
+    if asset["prob"] < threshold:
         return False
 
     if asset["score"] < 2:
@@ -49,7 +64,7 @@ def filtro_calidad(asset):
 # =========================
 def bot():
 
-    print("🚀 BOT HEDGE FUND REAL INICIADO")
+    print("🚀 BOT HEDGE FUND DINÁMICO INICIADO")
 
     contador = 0
 
@@ -87,7 +102,7 @@ def bot():
             portfolio.actualizar(precios)
 
             # =========================
-            # SIN EDGE = NO TRADE
+            # SIN EDGE
             # =========================
             if not candidatos:
                 print("⛔ NO TRADE (mercado sin ventaja)")
@@ -104,7 +119,7 @@ def bot():
             )
 
             # =========================
-            # CONTROL DE CAPACIDAD
+            # CAPACIDAD DISPONIBLE
             # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
@@ -114,7 +129,7 @@ def bot():
                 continue
 
             # =========================
-            # SELECCIÓN FINAL (TOP REAL)
+            # SELECCIÓN FINAL
             # =========================
             seleccion = candidatos[:espacios]
 
@@ -158,6 +173,7 @@ def bot():
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
             print(f"⏱ Cooldown: {portfolio.cooldown}s")
+            print(f"🧠 Trades realizados: {len(portfolio.historial)}")
 
             time.sleep(config.CYCLE_TIME)
 
