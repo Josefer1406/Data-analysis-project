@@ -33,7 +33,7 @@ VOLATILIDAD_LIMITE = 0.10
 VOLATILIDAD_MIN = 0.003
 
 # ==============================
-# 🔥 UNIVERSO AMPLIO
+# 🔥 UNIVERSO OKX CORREGIDO
 # ==============================
 CRYPTOS = [
     "BTC/USDT","ETH/USDT",
@@ -41,7 +41,7 @@ CRYPTOS = [
     "LINK/USDT","ATOM/USDT",
     "INJ/USDT","NEAR/USDT","APT/USDT",
     "OP/USDT","RENDER/USDT","AR/USDT",
-    "MATIC/USDT","XRP/USDT"
+    "POL/USDT","XRP/USDT"
 ]
 
 # ==============================
@@ -50,7 +50,7 @@ CRYPTOS = [
 CORRELACION = {
     "L1": ["BTC/USDT", "ETH/USDT"],
     "L2": ["SOL/USDT", "AVAX/USDT"],
-    "L3": ["ADA/USDT", "XRP/USDT", "MATIC/USDT"],
+    "L3": ["ADA/USDT", "XRP/USDT", "POL/USDT"],
     "L4": ["LINK/USDT", "ATOM/USDT"],
     "L5": ["INJ/USDT", "NEAR/USDT", "APT/USDT"],
     "L6": ["OP/USDT", "AR/USDT", "RENDER/USDT"]
