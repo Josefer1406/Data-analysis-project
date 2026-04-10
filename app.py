@@ -9,60 +9,18 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
-# =========================
-# SCORING
-# =========================
-def score_institucional(asset):
-
-    prob = asset["prob"]
-    score = asset["score"]
-
-    s = (prob * 0.6) + ((score / 3) * 0.4)
-
-    if prob > 0.9:
-        s += 0.1
-
-    return s
-
-
-# =========================
-# CLASIFICACIÓN
-# =========================
-def clasificar_trade(asset):
-
-    prob = asset["prob"]
-    score = asset["score"]
-
-    if prob >= 0.80 and score >= 2:
-        return "elite"
-
-    if prob >= 0.70 and score >= 1:
-        return "oportunista"
-
-    return None
-
-
-# =========================
-# BOT
-# =========================
 def bot():
 
-    print("🚀 BOT HEDGE FUND UNIVERSO DINÁMICO")
-
-    contador = 0
+    print("🚀 BOT HEDGE FUND REAL ACTIVADO")
 
     while True:
         try:
-            contador += 1
 
             print("\n🔎 Analizando mercado...")
 
-            ranking_total = []
+            candidatos = []
             precios = {}
 
-            # =========================
-            # SCAN GLOBAL
-            # =========================
             for symbol in config.CRYPTOS:
 
                 data = analizar(symbol)
@@ -71,120 +29,60 @@ def bot():
                     continue
 
                 precios[symbol] = data["precio"]
+                candidatos.append(data)
 
-                tipo = clasificar_trade(data)
-
-                if tipo is None:
-                    continue
-
-                data["score_final"] = score_institucional(data)
-
-                ranking_total.append(data)
-
-            # =========================
-            # ACTUALIZAR POSICIONES
-            # =========================
+            # actualizar posiciones
             portfolio.actualizar(precios)
 
-            if not ranking_total:
-                print("⛔ No hay activos válidos")
-                time.sleep(config.CYCLE_TIME)
-                continue
+            # ordenar mejores
+            candidatos = sorted(candidatos, key=lambda x: x["prob"], reverse=True)
 
             # =========================
-            # 🔥 UNIVERSO DINÁMICO
+            # ROTACIÓN FORZADA
             # =========================
-            ranking_total = sorted(
-                ranking_total,
-                key=lambda x: x["score_final"],
-                reverse=True
-            )
+            if len(portfolio.posiciones) > 0 and candidatos:
 
-            universo = ranking_total[:8]  # 🔥 SOLO LOS MEJORES
+                mejor = candidatos[0]
+
+                peor_symbol = None
+                peor_prob = 1
+
+                for s, pos in portfolio.posiciones.items():
+                    if pos["prob"] < peor_prob:
+                        peor_prob = pos["prob"]
+                        peor_symbol = s
+
+                if mejor["prob"] > peor_prob + 0.1:
+                    print(f"🔄 ROTANDO {peor_symbol} → {mejor['symbol']}")
+
+                    portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
+
+                    portfolio.comprar(
+                        mejor["symbol"],
+                        mejor["precio"],
+                        mejor["prob"]
+                    )
 
             # =========================
-            # DIVIDIR
-            # =========================
-            elite = [a for a in universo if clasificar_trade(a) == "elite"]
-            oportunistas = [a for a in universo if clasificar_trade(a) == "oportunista"]
-
-            # =========================
-            # CAPACIDAD
+            # ABRIR NUEVAS POSICIONES
             # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
-            # =========================
-            # SELECCIÓN
-            # =========================
             if espacios > 0:
+                nuevos = candidatos[:espacios]
 
-                seleccion = elite[:espacios]
-
-                if not seleccion:
-                    print("⚠️ Usando oportunistas")
-                    seleccion = oportunistas[:espacios]
-
-            else:
-                print("🔁 Evaluando rotación...")
-
-                candidatos = elite if elite else oportunistas
-
-                if not candidatos:
-                    print("⛔ Sin candidatos para rotar")
-                    time.sleep(config.CYCLE_TIME)
-                    continue
-
-                seleccion = [candidatos[0]]
-
-            # =========================
-            # EJECUCIÓN
-            # =========================
-            ejecutados = 0
-
-            for asset in seleccion:
-
-                ejecutado = portfolio.comprar(
-                    asset["symbol"],
-                    asset["precio"],
-                    asset["prob"],
-                    asset["score_final"],
-                    precios
-                )
-
-                if ejecutado:
-                    ejecutados += 1
-                    print(
-                        f"🟢 TRADE: {asset['symbol']} | "
-                        f"prob {round(asset['prob'],2)} | "
-                        f"score {round(asset['score_final'],2)}"
+                for asset in nuevos:
+                    portfolio.comprar(
+                        asset["symbol"],
+                        asset["precio"],
+                        asset["prob"]
                     )
 
-            if ejecutados == 0:
-                print("⛔ No se ejecutaron trades")
-
-            # =========================
-            # COOLDOWN
-            # =========================
+            # cooldown
             portfolio.actualizar_cooldown()
 
-            # =========================
-            # GUARDADO
-            # =========================
-            if contador % 20 == 0:
-                try:
-                    portfolio.guardar_resultados()
-                    print("💾 Resultados guardados")
-                except Exception as e:
-                    print(f"⚠️ Error guardando: {e}")
-
-            # =========================
-            # LOGS
-            # =========================
-            print(f"💰 Capital: {round(portfolio.capital,2)}")
+            print(f"💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print(f"🌐 Universo activo: {len(universo)}")
-            print(f"🔥 Elite: {len(elite)} | Oportunistas: {len(oportunistas)}")
-            print(f"⏱ Cooldown: {portfolio.cooldown}s")
 
             time.sleep(config.CYCLE_TIME)
 
