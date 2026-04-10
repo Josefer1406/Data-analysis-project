@@ -9,9 +9,34 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
+# =========================
+# SCORE REAL
+# =========================
+def score(asset):
+    return (asset["prob"] * 0.7) + ((asset["score"] / 3) * 0.3)
+
+
+# =========================
+# FILTRO FLEXIBLE
+# =========================
+def es_valido(asset):
+
+    # 🔥 MÁS PERMISIVO (clave)
+    if asset["prob"] < 0.70:
+        return False
+
+    if asset["score"] < 1:
+        return False
+
+    return True
+
+
+# =========================
+# BOT
+# =========================
 def bot():
 
-    print("🚀 BOT HEDGE FUND REAL ACTIVADO")
+    print("🚀 BOT RENTABLE ACTIVADO")
 
     while True:
         try:
@@ -21,6 +46,9 @@ def bot():
             candidatos = []
             precios = {}
 
+            # =========================
+            # SCAN
+            # =========================
             for symbol in config.CRYPTOS:
 
                 data = analizar(symbol)
@@ -29,33 +57,49 @@ def bot():
                     continue
 
                 precios[symbol] = data["precio"]
-                candidatos.append(data)
 
-            # actualizar posiciones
+                if es_valido(data):
+                    data["score_final"] = score(data)
+                    candidatos.append(data)
+
+            # =========================
+            # ACTUALIZAR POSICIONES
+            # =========================
             portfolio.actualizar(precios)
 
-            # ordenar mejores
-            candidatos = sorted(candidatos, key=lambda x: x["prob"], reverse=True)
+            # =========================
+            # ORDENAR
+            # =========================
+            candidatos = sorted(
+                candidatos,
+                key=lambda x: x["score_final"],
+                reverse=True
+            )
 
             # =========================
-            # ROTACIÓN FORZADA
+            # 🔥 ROTACIÓN REAL
             # =========================
-            if len(portfolio.posiciones) > 0 and candidatos:
+            if portfolio.posiciones and candidatos:
 
                 mejor = candidatos[0]
 
                 peor_symbol = None
-                peor_prob = 1
+                peor_score = 999
 
                 for s, pos in portfolio.posiciones.items():
-                    if pos["prob"] < peor_prob:
-                        peor_prob = pos["prob"]
+                    if pos["prob"] < peor_score:
+                        peor_score = pos["prob"]
                         peor_symbol = s
 
-                if mejor["prob"] > peor_prob + 0.1:
+                # 🔥 MÁS AGRESIVO
+                if mejor["prob"] > peor_score + 0.05:
                     print(f"🔄 ROTANDO {peor_symbol} → {mejor['symbol']}")
 
-                    portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
+                    portfolio.cerrar(
+                        peor_symbol,
+                        precios.get(peor_symbol, 0),
+                        0
+                    )
 
                     portfolio.comprar(
                         mejor["symbol"],
@@ -64,25 +108,36 @@ def bot():
                     )
 
             # =========================
-            # ABRIR NUEVAS POSICIONES
+            # 🔥 LLENAR POSICIONES SIEMPRE
             # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
             if espacios > 0:
-                nuevos = candidatos[:espacios]
 
-                for asset in nuevos:
+                print(f"📈 Buscando llenar {espacios} posiciones")
+
+                for asset in candidatos:
+
+                    if len(portfolio.posiciones) >= config.MAX_POSICIONES:
+                        break
+
                     portfolio.comprar(
                         asset["symbol"],
                         asset["precio"],
                         asset["prob"]
                     )
 
-            # cooldown
+            # =========================
+            # COOLDOWN
+            # =========================
             portfolio.actualizar_cooldown()
 
-            print(f"💰 Capital: {portfolio.capital}")
+            # =========================
+            # LOGS
+            # =========================
+            print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+            print(f"📈 Candidatos: {len(candidatos)}")
 
             time.sleep(config.CYCLE_TIME)
 
