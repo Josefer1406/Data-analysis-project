@@ -1,5 +1,7 @@
 import config
 import time
+import csv
+
 
 class Portfolio:
 
@@ -13,15 +15,43 @@ class Portfolio:
 
         print(f"🚀 Capital inicial: {self.capital_inicial}")
 
-    def puede_operar(self):
-        return (time.time() - self.last_trade) > self.cooldown
-
+    # =========================
+    # EXPOSICIÓN
+    # =========================
     def capital_invertido(self):
         return sum(p["inversion"] for p in self.posiciones.values())
 
-    def correlacionado(self, symbol):
-        grupo_nuevo = None
+    def exposicion_actual(self):
+        return self.capital_invertido() / self.capital_inicial
 
+    # =========================
+    # COOLDOWN
+    # =========================
+    def actualizar_cooldown(self):
+
+        if len(self.historial) < 5:
+            self.cooldown = 15
+            return
+
+        ultimos = self.historial[-5:]
+        winrate = sum(1 for t in ultimos if t["pnl"] > 0) / len(ultimos)
+
+        if winrate < 0.4:
+            self.cooldown = 60
+        elif winrate > 0.7:
+            self.cooldown = 10
+        else:
+            self.cooldown = 25
+
+    def puede_operar(self):
+        return (time.time() - self.last_trade) > self.cooldown
+
+    # =========================
+    # CORRELACIÓN
+    # =========================
+    def correlacionado(self, symbol):
+
+        grupo_nuevo = None
         for g, lista in config.CORRELACION.items():
             if symbol in lista:
                 grupo_nuevo = g
@@ -33,6 +63,9 @@ class Portfolio:
 
         return False
 
+    # =========================
+    # COMPRA
+    # =========================
     def comprar(self, symbol, precio, prob):
 
         if not self.puede_operar():
@@ -45,8 +78,10 @@ class Portfolio:
             return False
 
         if self.correlacionado(symbol):
+            print(f"⛔ Correlación evitada: {symbol}")
             return False
 
+        # SIZE
         if prob >= 0.9:
             size = 0.30
         elif prob >= 0.75:
@@ -81,6 +116,9 @@ class Portfolio:
 
         return True
 
+    # =========================
+    # ACTUALIZAR (🔥 FIX REAL)
+    # =========================
     def actualizar(self, precios):
 
         for symbol in list(self.posiciones.keys()):
@@ -91,7 +129,13 @@ class Portfolio:
             if precio is None:
                 continue
 
+            # 🔥 FIX: asegurar timestamp
+            if "timestamp" not in pos:
+                pos["timestamp"] = time.time()
+
             pnl = (precio - pos["entry"]) / pos["entry"]
+
+            print(f"📊 {symbol} pnl: {round(pnl,4)}")
 
             # actualizar max
             if precio > pos["max_precio"]:
@@ -101,13 +145,17 @@ class Portfolio:
             if pnl > config.TRAILING_START:
                 pos["trailing"] = True
 
-            # stop loss
+            # =========================
+            # STOP LOSS
+            # =========================
             if pnl <= config.STOP_LOSS:
                 print(f"🛑 STOP LOSS {symbol}")
                 self.cerrar(symbol, precio, pnl)
                 continue
 
-            # trailing
+            # =========================
+            # TRAILING
+            # =========================
             if pos["trailing"]:
                 stop = pos["max_precio"] * (1 - config.TRAILING_GAP)
                 if precio <= stop:
@@ -115,14 +163,21 @@ class Portfolio:
                     self.cerrar(symbol, precio, pnl)
                     continue
 
-            # 🔥 SALIDA POR TIEMPO
-            tiempo_max = 60 * 60 * 2  # 2 horas
+            # =========================
+            # 🔥 TIEMPO (CLAVE)
+            # =========================
+            tiempo_trade = time.time() - pos["timestamp"]
 
-            if time.time() - pos["timestamp"] > tiempo_max:
-                print(f"⏰ CIERRE POR TIEMPO {symbol}")
+            print(f"⏱ {symbol} tiempo: {int(tiempo_trade)}s")
+
+            if tiempo_trade > 7200:  # 2 horas
+                print(f"⏰ CIERRE FORZADO {symbol}")
                 self.cerrar(symbol, precio, pnl)
                 continue
 
+    # =========================
+    # CERRAR
+    # =========================
     def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones[symbol]
@@ -130,37 +185,49 @@ class Portfolio:
         valor = pos["cantidad"] * precio
         self.capital += valor
 
-        self.historial.append({
+        trade = {
             "symbol": symbol,
-            "pnl": round(pnl, 4),
-            "capital": round(self.capital, 2),
+            "pnl": float(round(pnl, 4)),
+            "capital": float(round(self.capital, 2)),
             "tipo": "SELL"
-        })
+        }
+
+        self.historial.append(trade)
 
         print(f"🔴 SELL {symbol} | pnl {pnl:.4f}")
 
         del self.posiciones[symbol]
 
-    def actualizar_cooldown(self):
+    # =========================
+    # GUARDAR
+    # =========================
+    def guardar_resultados(self):
 
-        if len(self.historial) < 5:
-            self.cooldown = 20
-            return
+        data = {
+            "capital_final": self.capital,
+            "trades": len(self.historial)
+        }
 
-        ultimos = self.historial[-5:]
-        winrate = sum(1 for t in ultimos if t["pnl"] > 0) / len(ultimos)
+        with open("resultados_bot.csv", "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=data.keys())
 
-        if winrate < 0.4:
-            self.cooldown = 60
-        elif winrate > 0.7:
-            self.cooldown = 10
-        else:
-            self.cooldown = 25
+            if f.tell() == 0:
+                writer.writeheader()
 
+            writer.writerow(data)
+
+    # =========================
+    # DATA
+    # =========================
     def data(self):
+
+        capital_actual = round(self.capital, 2)
+        pnl = round(capital_actual - self.capital_inicial, 2)
+
         return {
-            "capital": round(self.capital, 2),
+            "capital": capital_actual,
             "capital_inicial": self.capital_inicial,
+            "pnl": pnl,
             "posiciones": self.posiciones,
             "historial": self.historial
         }
