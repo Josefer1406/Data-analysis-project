@@ -10,33 +10,33 @@ app = Flask(__name__)
 
 
 # =========================
-# SCORE REAL
+# SCORE INSTITUCIONAL
 # =========================
 def score(asset):
-    return (asset["prob"] * 0.7) + ((asset["score"] / 3) * 0.3)
+    return (asset["prob"] * 0.6) + ((asset["score"] / 5) * 0.4)
 
 
 # =========================
-# FILTRO FLEXIBLE
+# FILTRO BALANCEADO
 # =========================
 def es_valido(asset):
 
-    # 🔥 MÁS PERMISIVO (clave)
-    if asset["prob"] < 0.70:
+    # 🔥 MÁS FLEXIBLE PERO CONTROLADO
+    if asset["prob"] < 0.55:
         return False
 
-    if asset["score"] < 1:
+    if asset["score"] < 2:
         return False
 
     return True
 
 
 # =========================
-# BOT
+# BOT PRINCIPAL
 # =========================
 def bot():
 
-    print("🚀 BOT RENTABLE ACTIVADO")
+    print("🚀 BOT BALANCEADO ACTIVADO")
 
     while True:
         try:
@@ -68,6 +68,16 @@ def bot():
             portfolio.actualizar(precios)
 
             # =========================
+            # SIN CANDIDATOS
+            # =========================
+            if not candidatos:
+                print("⛔ Sin candidatos válidos")
+                print(f"💰 Capital: {round(portfolio.capital,2)}")
+                print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+                time.sleep(config.CYCLE_TIME)
+                continue
+
+            # =========================
             # ORDENAR
             # =========================
             candidatos = sorted(
@@ -77,9 +87,9 @@ def bot():
             )
 
             # =========================
-            # 🔥 ROTACIÓN REAL
+            # 🔥 ROTACIÓN INTELIGENTE
             # =========================
-            if portfolio.posiciones and candidatos:
+            if portfolio.posiciones:
 
                 mejor = candidatos[0]
 
@@ -91,8 +101,8 @@ def bot():
                         peor_score = pos["prob"]
                         peor_symbol = s
 
-                # 🔥 MÁS AGRESIVO
-                if mejor["prob"] > peor_score + 0.05:
+                # 🔥 MÁS FRECUENTE
+                if mejor["prob"] > peor_score + 0.03:
                     print(f"🔄 ROTANDO {peor_symbol} → {mejor['symbol']}")
 
                     portfolio.cerrar(
@@ -108,36 +118,40 @@ def bot():
                     )
 
             # =========================
-            # 🔥 LLENAR POSICIONES SIEMPRE
+            # 🔥 LLENADO INTELIGENTE
             # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
             if espacios > 0:
 
-                print(f"📈 Buscando llenar {espacios} posiciones")
+                print(f"📈 Llenando hasta {config.MAX_POSICIONES} posiciones")
 
                 for asset in candidatos:
 
                     if len(portfolio.posiciones) >= config.MAX_POSICIONES:
                         break
 
-                    portfolio.comprar(
+                    ejecutado = portfolio.comprar(
                         asset["symbol"],
                         asset["precio"],
                         asset["prob"]
                     )
 
+                    if ejecutado:
+                        print(f"🟢 BUY {asset['symbol']} | prob {asset['prob']}")
+
             # =========================
-            # COOLDOWN
+            # COOLDOWN DINÁMICO
             # =========================
             portfolio.actualizar_cooldown()
 
             # =========================
-            # LOGS
+            # LOGS CLAROS
             # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
+            print(f"⏱ Cooldown: {portfolio.cooldown}s")
 
             time.sleep(config.CYCLE_TIME)
 
@@ -146,11 +160,17 @@ def bot():
             time.sleep(5)
 
 
+# =========================
+# API
+# =========================
 @app.route("/data")
 def data():
     return jsonify(portfolio.data())
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
     threading.Thread(target=bot).start()
     app.run(host="0.0.0.0", port=8080)
