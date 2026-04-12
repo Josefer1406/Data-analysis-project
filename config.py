@@ -2,45 +2,44 @@
 # CONFIG HEDGE FUND PRO
 # ==============================
 
+# Capital
 CAPITAL_INICIAL = 1000
-USO_CAPITAL = 0.60
+USO_CAPITAL = 0.60  # 40% reserva
 
-MAX_POSICIONES = 3
-MIN_TRADE_USD = 30
+# Trading
+MAX_POSICIONES = 4
 
+# Timeframe
 TIMEFRAME = "5m"
-CYCLE_TIME = 15
+CYCLE_TIME = 20
 
-# 🔥 RIESGO REAL
-STOP_LOSS = -0.04
+# Riesgo
+STOP_LOSS = -0.03
 
-TRAILING_START = 0.025
+# Trailing
+TRAILING_START = 0.02
 TRAILING_GAP = 0.015
 
-UMBRAL_EXCELENTE = 0.9
-UMBRAL_BUENO = 0.75
+# Volatilidad
+VOLATILIDAD_LIMITE = 0.05
+VOLATILIDAD_MIN = 0.001
 
-COOLDOWN_BASE = 20
-
-VOLATILIDAD_LIMITE = 0.12
-VOLATILIDAD_MIN = 0.002
-
-# 🔥 UNIVERSO LIMPIO (OKX REAL)
+# Universo
 CRYPTOS = [
-    "BTC/USDT",
-    "ETH/USDT",
-    "SOL/USDT",
-    "AVAX/USDT",
-    "ADA/USDT",
-    "XRP/USDT",
-    "LINK/USDT",
-    "ATOM/USDT",
-    "NEAR/USDT"
+    "BTC/USDT","ETH/USDT",
+    "SOL/USDT","AVAX/USDT","NEAR/USDT",
+    "ATOM/USDT","INJ/USDT",
+    "ARB/USDT","OP/USDT",
+    "FTM/USDT","SEI/USDT","SUI/USDT",
+    "LINK/USDT","APT/USDT"
 ]
 
+# Correlación REAL
 CORRELACION = {
     "L1": ["BTC/USDT", "ETH/USDT"],
-    "L2": ["SOL/USDT", "AVAX/USDT"],
-    "L3": ["ADA/USDT", "XRP/USDT"],
-    "L4": ["LINK/USDT", "ATOM/USDT"]
+    "L2": ["SOL/USDT", "AVAX/USDT", "NEAR/USDT"],
+    "L3": ["ARB/USDT", "OP/USDT"],
+    "L4": ["ATOM/USDT", "INJ/USDT"],
+    "L5": ["FTM/USDT", "SEI/USDT", "SUI/USDT"],
+    "L6": ["LINK/USDT", "APT/USDT"]
 }
