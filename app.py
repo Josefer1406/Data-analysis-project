@@ -9,25 +9,10 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
-# =========================
-# CONFIG PRO
-# =========================
-MAX_POSICIONES = 4
-RESERVA = 0.40
-INV_ELITE = 0.15
-INV_NORMAL = 0.10
-
-
-# =========================
-# SCORE
-# =========================
 def score(asset):
     return (asset["prob"] * 0.65) + ((asset["score"] / 5) * 0.35)
 
 
-# =========================
-# CLASIFICACIÓN
-# =========================
 def clasificar(asset):
 
     if asset["prob"] >= 0.75 and asset["score"] >= 3:
@@ -39,31 +24,29 @@ def clasificar(asset):
     return None
 
 
-# =========================
-# ANTI CORRELACIÓN
-# =========================
 def correlacionado(symbol, posiciones):
 
-    base = symbol.split("/")[0]
+    grupo_nuevo = None
 
-    for p in posiciones:
-        if base in p:
-            return True
+    for g, lista in config.CORRELACION.items():
+        if symbol in lista:
+            grupo_nuevo = g
+            break
+
+    for s in posiciones:
+        for g, lista in config.CORRELACION.items():
+            if s in lista and g == grupo_nuevo:
+                return True
 
     return False
 
 
-# =========================
-# BOT
-# =========================
 def bot():
 
-    print("🚀 BOT PRO RENTABLE ACTIVADO")
+    print("🚀 BOT FINAL ACTIVADO")
 
     while True:
         try:
-
-            print("\n🔎 Analizando mercado...")
 
             candidatos = []
             precios = {}
@@ -87,23 +70,11 @@ def bot():
 
                 candidatos.append(data)
 
-            # =========================
-            # ACTUALIZAR POSICIONES
-            # =========================
             portfolio.actualizar(precios)
 
-            # =========================
-            # ORDENAR
-            # =========================
-            candidatos = sorted(
-                candidatos,
-                key=lambda x: x["score_final"],
-                reverse=True
-            )
+            candidatos = sorted(candidatos, key=lambda x: x["score_final"], reverse=True)
 
-            # =========================
-            # ROTACIÓN INTELIGENTE
-            # =========================
+            # ROTACIÓN
             if portfolio.posiciones and candidatos:
 
                 mejor = candidatos[0]
@@ -117,26 +88,13 @@ def bot():
                         peor_symbol = s
 
                 if mejor["prob"] > peor_prob + 0.05:
-                    print(f"🔄 ROTANDO {peor_symbol} → {mejor['symbol']}")
+                    portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
 
-                    portfolio.cerrar(
-                        peor_symbol,
-                        precios.get(peor_symbol, 0),
-                        0
-                    )
+            capital_operable = portfolio.capital * config.USO_CAPITAL
 
-            # =========================
-            # CAPITAL DISPONIBLE
-            # =========================
-            capital_total = portfolio.capital
-            capital_operable = capital_total * (1 - RESERVA)
-
-            # =========================
-            # LLENAR POSICIONES
-            # =========================
             for asset in candidatos:
 
-                if len(portfolio.posiciones) >= MAX_POSICIONES:
+                if len(portfolio.posiciones) >= config.MAX_POSICIONES:
                     break
 
                 if asset["symbol"] in portfolio.posiciones:
@@ -146,32 +104,17 @@ def bot():
                     continue
 
                 if asset["tipo"] == "elite":
-                    inversion = capital_operable * INV_ELITE
+                    inversion = capital_operable * 0.15
                 else:
-                    inversion = capital_operable * INV_NORMAL
+                    inversion = capital_operable * 0.10
 
-                ejecutado = portfolio.comprar(
+                portfolio.comprar(
                     asset["symbol"],
                     asset["precio"],
                     asset["prob"],
                     inversion
                 )
 
-                if ejecutado:
-                    print(
-                        f"🟢 BUY {asset['symbol']} | "
-                        f"{asset['tipo']} | "
-                        f"${round(inversion,2)}"
-                    )
-
-            # =========================
-            # COOLDOWN
-            # =========================
-            portfolio.actualizar_cooldown()
-
-            # =========================
-            # LOGS
-            # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
@@ -183,17 +126,11 @@ def bot():
             time.sleep(5)
 
 
-# =========================
-# API
-# =========================
 @app.route("/data")
 def data():
     return jsonify(portfolio.data())
 
 
-# =========================
-# RUN
-# =========================
 if __name__ == "__main__":
     threading.Thread(target=bot).start()
     app.run(host="0.0.0.0", port=8080)
