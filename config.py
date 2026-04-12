@@ -29,8 +29,7 @@ CRYPTOS = [
     "BTC/USDT","ETH/USDT",
     "SOL/USDT","AVAX/USDT","NEAR/USDT",
     "ATOM/USDT","INJ/USDT",
-    "ARB/USDT","OP/USDT",
-    "FTM/USDT","SEI/USDT","SUI/USDT",
+    "ARB/USDT","OP/USDT","SEI/USDT","SUI/USDT",
     "LINK/USDT","APT/USDT"
 ]
 
@@ -40,6 +39,6 @@ CORRELACION = {
     "L2": ["SOL/USDT", "AVAX/USDT", "NEAR/USDT"],
     "L3": ["ARB/USDT", "OP/USDT"],
     "L4": ["ATOM/USDT", "INJ/USDT"],
-    "L5": ["FTM/USDT", "SEI/USDT", "SUI/USDT"],
+    "L5": ["SEI/USDT", "SUI/USDT"],
     "L6": ["LINK/USDT", "APT/USDT"]
 }
