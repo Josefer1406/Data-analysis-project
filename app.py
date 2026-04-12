@@ -10,33 +10,55 @@ app = Flask(__name__)
 
 
 # =========================
-# SCORE INSTITUCIONAL
+# CONFIG PRO
+# =========================
+MAX_POSICIONES = 4
+RESERVA = 0.40
+INV_ELITE = 0.15
+INV_NORMAL = 0.10
+
+
+# =========================
+# SCORE
 # =========================
 def score(asset):
-    return (asset["prob"] * 0.6) + ((asset["score"] / 5) * 0.4)
+    return (asset["prob"] * 0.65) + ((asset["score"] / 5) * 0.35)
 
 
 # =========================
-# FILTRO BALANCEADO
+# CLASIFICACIÓN
 # =========================
-def es_valido(asset):
+def clasificar(asset):
 
-    # 🔥 MÁS FLEXIBLE PERO CONTROLADO
-    if asset["prob"] < 0.55:
-        return False
+    if asset["prob"] >= 0.75 and asset["score"] >= 3:
+        return "elite"
 
-    if asset["score"] < 2:
-        return False
+    if asset["prob"] >= 0.60 and asset["score"] >= 2:
+        return "buena"
 
-    return True
+    return None
 
 
 # =========================
-# BOT PRINCIPAL
+# ANTI CORRELACIÓN
+# =========================
+def correlacionado(symbol, posiciones):
+
+    base = symbol.split("/")[0]
+
+    for p in posiciones:
+        if base in p:
+            return True
+
+    return False
+
+
+# =========================
+# BOT
 # =========================
 def bot():
 
-    print("🚀 BOT BALANCEADO ACTIVADO")
+    print("🚀 BOT PRO RENTABLE ACTIVADO")
 
     while True:
         try:
@@ -46,9 +68,6 @@ def bot():
             candidatos = []
             precios = {}
 
-            # =========================
-            # SCAN
-            # =========================
             for symbol in config.CRYPTOS:
 
                 data = analizar(symbol)
@@ -58,24 +77,20 @@ def bot():
 
                 precios[symbol] = data["precio"]
 
-                if es_valido(data):
-                    data["score_final"] = score(data)
-                    candidatos.append(data)
+                tipo = clasificar(data)
+
+                if tipo is None:
+                    continue
+
+                data["tipo"] = tipo
+                data["score_final"] = score(data)
+
+                candidatos.append(data)
 
             # =========================
             # ACTUALIZAR POSICIONES
             # =========================
             portfolio.actualizar(precios)
-
-            # =========================
-            # SIN CANDIDATOS
-            # =========================
-            if not candidatos:
-                print("⛔ Sin candidatos válidos")
-                print(f"💰 Capital: {round(portfolio.capital,2)}")
-                print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-                time.sleep(config.CYCLE_TIME)
-                continue
 
             # =========================
             # ORDENAR
@@ -87,22 +102,21 @@ def bot():
             )
 
             # =========================
-            # 🔥 ROTACIÓN INTELIGENTE
+            # ROTACIÓN INTELIGENTE
             # =========================
-            if portfolio.posiciones:
+            if portfolio.posiciones and candidatos:
 
                 mejor = candidatos[0]
 
                 peor_symbol = None
-                peor_score = 999
+                peor_prob = 999
 
                 for s, pos in portfolio.posiciones.items():
-                    if pos["prob"] < peor_score:
-                        peor_score = pos["prob"]
+                    if pos["prob"] < peor_prob:
+                        peor_prob = pos["prob"]
                         peor_symbol = s
 
-                # 🔥 MÁS FRECUENTE
-                if mejor["prob"] > peor_score + 0.03:
+                if mejor["prob"] > peor_prob + 0.05:
                     print(f"🔄 ROTANDO {peor_symbol} → {mejor['symbol']}")
 
                     portfolio.cerrar(
@@ -111,47 +125,56 @@ def bot():
                         0
                     )
 
-                    portfolio.comprar(
-                        mejor["symbol"],
-                        mejor["precio"],
-                        mejor["prob"]
+            # =========================
+            # CAPITAL DISPONIBLE
+            # =========================
+            capital_total = portfolio.capital
+            capital_operable = capital_total * (1 - RESERVA)
+
+            # =========================
+            # LLENAR POSICIONES
+            # =========================
+            for asset in candidatos:
+
+                if len(portfolio.posiciones) >= MAX_POSICIONES:
+                    break
+
+                if asset["symbol"] in portfolio.posiciones:
+                    continue
+
+                if correlacionado(asset["symbol"], portfolio.posiciones):
+                    continue
+
+                if asset["tipo"] == "elite":
+                    inversion = capital_operable * INV_ELITE
+                else:
+                    inversion = capital_operable * INV_NORMAL
+
+                ejecutado = portfolio.comprar(
+                    asset["symbol"],
+                    asset["precio"],
+                    asset["prob"],
+                    inversion
+                )
+
+                if ejecutado:
+                    print(
+                        f"🟢 BUY {asset['symbol']} | "
+                        f"{asset['tipo']} | "
+                        f"${round(inversion,2)}"
                     )
 
             # =========================
-            # 🔥 LLENADO INTELIGENTE
-            # =========================
-            espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
-
-            if espacios > 0:
-
-                print(f"📈 Llenando hasta {config.MAX_POSICIONES} posiciones")
-
-                for asset in candidatos:
-
-                    if len(portfolio.posiciones) >= config.MAX_POSICIONES:
-                        break
-
-                    ejecutado = portfolio.comprar(
-                        asset["symbol"],
-                        asset["precio"],
-                        asset["prob"]
-                    )
-
-                    if ejecutado:
-                        print(f"🟢 BUY {asset['symbol']} | prob {asset['prob']}")
-
-            # =========================
-            # COOLDOWN DINÁMICO
+            # COOLDOWN
             # =========================
             portfolio.actualizar_cooldown()
 
             # =========================
-            # LOGS CLAROS
+            # LOGS
             # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
-            print(f"⏱ Cooldown: {portfolio.cooldown}s")
 
             time.sleep(config.CYCLE_TIME)
 
