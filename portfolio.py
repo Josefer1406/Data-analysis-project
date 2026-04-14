@@ -1,6 +1,7 @@
 import time
 import config
 
+
 class Portfolio:
 
     def __init__(self):
@@ -31,15 +32,15 @@ class Portfolio:
         winrate = self.win / total
 
         if winrate < 0.4:
-            return 0.75  # más conservador
+            return 0.75
 
         if winrate > 0.6:
-            return 0.65  # más agresivo
+            return 0.65
 
         return config.PROB_MIN
 
     # =========================
-    # ACTUALIZAR
+    # ACTUALIZAR POSICIONES
     # =========================
     def actualizar(self, precios):
 
@@ -53,11 +54,11 @@ class Portfolio:
 
             pnl = (precio_actual - pos["entry"]) / pos["entry"]
 
-            # TP
+            # Take profit
             if pnl > 0.015:
                 self.cerrar(s, precio_actual, pnl)
 
-            # SL
+            # Stop loss
             elif pnl < -0.02:
                 self.cerrar(s, precio_actual, pnl)
 
@@ -66,7 +67,7 @@ class Portfolio:
     # =========================
     def comprar(self, symbol, precio, prob, tipo):
 
-        # cooldown activo
+        # cooldown anti-reentrada
         if symbol in self.cooldowns:
             if time.time() < self.cooldowns[symbol]:
                 return False
@@ -74,17 +75,24 @@ class Portfolio:
         if symbol in self.posiciones:
             return False
 
-        capital_disponible = self.capital * (1 - config.RESERVA_CAPITAL)
+        if len(self.posiciones) >= config.MAX_POSICIONES:
+            return False
 
-        if capital_disponible <= 0:
+        # 🔥 SIN USO_CAPITAL (CORREGIDO)
+        capital_operable = self.capital * (1 - config.RESERVA_CAPITAL)
+
+        if capital_operable <= 0:
             return False
 
         if tipo == "elite":
-            inversion = capital_disponible * config.RIESGO_ELITE
+            inversion = capital_operable * config.RIESGO_ELITE
         else:
-            inversion = capital_disponible * config.RIESGO_NORMAL
+            inversion = capital_operable * config.RIESGO_NORMAL
 
         if inversion <= 10:
+            return False
+
+        if inversion > self.capital:
             return False
 
         self.capital -= inversion
@@ -110,13 +118,13 @@ class Portfolio:
         resultado = pos["inversion"] * (1 + pnl)
         self.capital += resultado
 
-        # IA aprendizaje
+        # IA aprende
         if pnl > 0:
             self.win += 1
         else:
             self.loss += 1
 
-        # cooldown
+        # cooldown anti-recompra
         self.cooldowns[symbol] = time.time() + config.COOLDOWN_SYMBOL
 
         print(f"🔴 SELL {symbol} pnl {round(pnl,4)}")
@@ -124,7 +132,7 @@ class Portfolio:
     # =========================
     def data(self):
         return {
-            "capital": self.capital,
+            "capital": round(self.capital, 2),
             "posiciones": self.posiciones,
             "win": self.win,
             "loss": self.loss
