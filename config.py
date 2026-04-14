@@ -1,44 +1,46 @@
-# ==============================
-# CONFIG HEDGE FUND PRO
-# ==============================
+# =========================
+# CONFIG GLOBAL
+# =========================
 
-# Capital
-CAPITAL_INICIAL = 1000
-USO_CAPITAL = 0.60  # 40% reserva
-
-# Trading
-MAX_POSICIONES = 4
-
-# Timeframe
 TIMEFRAME = "5m"
 CYCLE_TIME = 20
 
-# Riesgo
-STOP_LOSS = -0.03
+MAX_POSICIONES = 4
 
-# Trailing
-TRAILING_START = 0.02
-TRAILING_GAP = 0.015
+# Capital
+CAPITAL_INICIAL = 1000
+RESERVA_CAPITAL = 0.40
+
+# Inversión
+RIESGO_ELITE = 0.15
+RIESGO_NORMAL = 0.10
+
+# IA
+IA_ADAPTATIVA = True
+
+# Filtro base (se ajusta dinámicamente)
+PROB_MIN = 0.70
+SCORE_MIN = 1
+
+# Rotación
+ROTACION_UMBRAL = 0.15
+
+# Cooldown por activo
+COOLDOWN_SYMBOL = 120  # segundos
 
 # Volatilidad
 VOLATILIDAD_LIMITE = 0.05
 VOLATILIDAD_MIN = 0.001
 
-# Universo
+# Universo (luego se puede hacer dinámico)
 CRYPTOS = [
-    "BTC/USDT","ETH/USDT",
-    "SOL/USDT","AVAX/USDT","NEAR/USDT",
-    "ATOM/USDT","INJ/USDT",
-    "ARB/USDT","OP/USDT","SEI/USDT","SUI/USDT",
-    "LINK/USDT","APT/USDT"
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "ATOM/USDT",
+    "AVAX/USDT",
+    "OP/USDT",
+    "ARB/USDT",
+    "SEI/USDT",
+    "APT/USDT"
 ]
-
-# Correlación REAL
-CORRELACION = {
-    "L1": ["BTC/USDT", "ETH/USDT"],
-    "L2": ["SOL/USDT", "AVAX/USDT", "NEAR/USDT"],
-    "L3": ["ARB/USDT", "OP/USDT"],
-    "L4": ["ATOM/USDT", "INJ/USDT"],
-    "L5": ["SEI/USDT", "SUI/USDT"],
-    "L6": ["LINK/USDT", "APT/USDT"]
-}
