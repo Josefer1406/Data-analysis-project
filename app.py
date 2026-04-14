@@ -17,7 +17,7 @@ def score(asset):
 
 
 # =========================
-# CLASIFICACIÓN
+# CLASIFICACIÓN DINÁMICA
 # =========================
 def clasificar(asset, prob_min):
 
@@ -45,6 +45,7 @@ def bot():
             candidatos = []
             precios = {}
 
+            # IA decide exigencia
             prob_min = portfolio.ajustar_filtro()
 
             # =========================
@@ -70,27 +71,32 @@ def bot():
                 candidatos.append(data)
 
             # =========================
+            # ACTUALIZAR POSICIONES
+            # =========================
             portfolio.actualizar(precios)
 
+            # =========================
+            # ORDENAR
+            # =========================
             candidatos = sorted(candidatos, key=lambda x: x["score_final"], reverse=True)
 
             # =========================
-            # ROTACIÓN INTELIGENTE REAL
+            # ROTACIÓN INTELIGENTE
             # =========================
             if portfolio.posiciones and candidatos:
 
                 mejor = candidatos[0]
 
                 peor_symbol = None
-                peor_score = 999
+                peor_prob = 999
 
                 for s, pos in portfolio.posiciones.items():
-                    if pos["prob"] < peor_score:
-                        peor_score = pos["prob"]
+                    if pos["prob"] < peor_prob:
+                        peor_prob = pos["prob"]
                         peor_symbol = s
 
-                if mejor["prob"] > peor_score + config.ROTACION_UMBRAL:
-                    print(f"🔄 ROTACIÓN REAL {peor_symbol} → {mejor['symbol']}")
+                if mejor["prob"] > peor_prob + config.ROTACION_UMBRAL:
+                    print(f"🔄 ROTACIÓN {peor_symbol} → {mejor['symbol']}")
 
                     portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
 
@@ -123,11 +129,13 @@ def bot():
                     )
 
             # =========================
+            # LOGS
+            # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
             print(f"🧠 IA Win/Loss: {portfolio.win}/{portfolio.loss}")
-            print(f"🎯 Prob mínima actual: {prob_min}")
+            print(f"🎯 Prob mínima: {prob_min}")
 
             time.sleep(config.CYCLE_TIME)
 
