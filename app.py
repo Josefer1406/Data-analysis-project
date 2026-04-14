@@ -9,48 +9,47 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
+# =========================
+# SCORE
+# =========================
 def score(asset):
-    return (asset["prob"] * 0.65) + ((asset["score"] / 5) * 0.35)
+    return (asset["prob"] * 0.7) + ((asset["score"] / 3) * 0.3)
 
 
-def clasificar(asset):
+# =========================
+# CLASIFICACIÓN
+# =========================
+def clasificar(asset, prob_min):
 
-    if asset["prob"] >= 0.75 and asset["score"] >= 3:
+    if asset["prob"] >= prob_min + 0.1 and asset["score"] >= 2:
         return "elite"
 
-    if asset["prob"] >= 0.60 and asset["score"] >= 2:
-        return "buena"
+    if asset["prob"] >= prob_min and asset["score"] >= 1:
+        return "normal"
 
     return None
 
 
-def correlacionado(symbol, posiciones):
-
-    grupo_nuevo = None
-
-    for g, lista in config.CORRELACION.items():
-        if symbol in lista:
-            grupo_nuevo = g
-            break
-
-    for s in posiciones:
-        for g, lista in config.CORRELACION.items():
-            if s in lista and g == grupo_nuevo:
-                return True
-
-    return False
-
-
+# =========================
+# BOT
+# =========================
 def bot():
 
-    print("🚀 BOT FINAL ACTIVADO")
+    print("🚀 BOT IA RENTABLE ACTIVADO")
 
     while True:
         try:
 
+            print("\n🔎 Analizando mercado...")
+
             candidatos = []
             precios = {}
 
+            prob_min = portfolio.ajustar_filtro()
+
+            # =========================
+            # SCAN
+            # =========================
             for symbol in config.CRYPTOS:
 
                 data = analizar(symbol)
@@ -60,64 +59,75 @@ def bot():
 
                 precios[symbol] = data["precio"]
 
-                tipo = clasificar(data)
+                tipo = clasificar(data, prob_min)
 
                 if tipo is None:
                     continue
 
-                data["tipo"] = tipo
                 data["score_final"] = score(data)
+                data["tipo"] = tipo
 
                 candidatos.append(data)
 
+            # =========================
             portfolio.actualizar(precios)
 
             candidatos = sorted(candidatos, key=lambda x: x["score_final"], reverse=True)
 
-            # ROTACIÓN
+            # =========================
+            # ROTACIÓN INTELIGENTE REAL
+            # =========================
             if portfolio.posiciones and candidatos:
 
                 mejor = candidatos[0]
 
                 peor_symbol = None
-                peor_prob = 999
+                peor_score = 999
 
                 for s, pos in portfolio.posiciones.items():
-                    if pos["prob"] < peor_prob:
-                        peor_prob = pos["prob"]
+                    if pos["prob"] < peor_score:
+                        peor_score = pos["prob"]
                         peor_symbol = s
 
-                if mejor["prob"] > peor_prob + 0.05:
+                if mejor["prob"] > peor_score + config.ROTACION_UMBRAL:
+                    print(f"🔄 ROTACIÓN REAL {peor_symbol} → {mejor['symbol']}")
+
                     portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
 
-            capital_operable = portfolio.capital * config.USO_CAPITAL
+                    portfolio.comprar(
+                        mejor["symbol"],
+                        mejor["precio"],
+                        mejor["prob"],
+                        mejor["tipo"]
+                    )
 
-            for asset in candidatos:
+            # =========================
+            # LLENAR PORTAFOLIO
+            # =========================
+            espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
-                if len(portfolio.posiciones) >= config.MAX_POSICIONES:
-                    break
+            if espacios > 0:
 
-                if asset["symbol"] in portfolio.posiciones:
-                    continue
+                print(f"📈 Llenando {espacios} posiciones")
 
-                if correlacionado(asset["symbol"], portfolio.posiciones):
-                    continue
+                for asset in candidatos:
 
-                if asset["tipo"] == "elite":
-                    inversion = capital_operable * 0.15
-                else:
-                    inversion = capital_operable * 0.10
+                    if len(portfolio.posiciones) >= config.MAX_POSICIONES:
+                        break
 
-                portfolio.comprar(
-                    asset["symbol"],
-                    asset["precio"],
-                    asset["prob"],
-                    inversion
-                )
+                    portfolio.comprar(
+                        asset["symbol"],
+                        asset["precio"],
+                        asset["prob"],
+                        asset["tipo"]
+                    )
 
+            # =========================
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
+            print(f"🧠 IA Win/Loss: {portfolio.win}/{portfolio.loss}")
+            print(f"🎯 Prob mínima actual: {prob_min}")
 
             time.sleep(config.CYCLE_TIME)
 
