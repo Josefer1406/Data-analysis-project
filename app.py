@@ -2,32 +2,76 @@ from flask import Flask, jsonify
 import threading
 import time
 import config
+import json
+import os
 
 from services.scanner import analizar
 from portfolio import portfolio
 
 app = Flask(__name__)
 
+# =========================
+# IA STORAGE
+# =========================
+IA_FILE = "ia_state.json"
+
+def cargar_ia():
+    if os.path.exists(IA_FILE):
+        with open(IA_FILE, "r") as f:
+            return json.load(f)
+    return {"wins": 0, "losses": 0, "prob_min": 0.75}
+
+def guardar_ia(data):
+    with open(IA_FILE, "w") as f:
+        json.dump(data, f)
+
+ia = cargar_ia()
+
 
 # =========================
-# SCORE
+# SCORE INTELIGENTE
 # =========================
 def score(asset):
     return (asset["prob"] * 0.7) + ((asset["score"] / 3) * 0.3)
 
 
 # =========================
-# CLASIFICACIÓN DINÁMICA
+# FILTRO IA
 # =========================
-def clasificar(asset, prob_min):
+def es_valido(asset):
 
-    if asset["prob"] >= prob_min + 0.1 and asset["score"] >= 2:
-        return "elite"
+    prob_min = ia["prob_min"]
 
-    if asset["prob"] >= prob_min and asset["score"] >= 1:
-        return "normal"
+    if asset["prob"] < prob_min:
+        return False
 
-    return None
+    if asset["score"] < 1:
+        return False
+
+    return True
+
+
+# =========================
+# AJUSTE IA DINÁMICO
+# =========================
+def ajustar_ia():
+
+    total = ia["wins"] + ia["losses"]
+
+    if total < 20:
+        return
+
+    winrate = ia["wins"] / total
+
+    # 🔥 si pierde mucho → más estricto
+    if winrate < 0.4:
+        ia["prob_min"] = min(0.85, ia["prob_min"] + 0.01)
+
+    # 🔥 si gana → más agresivo
+    elif winrate > 0.6:
+        ia["prob_min"] = max(0.65, ia["prob_min"] - 0.01)
+
+    guardar_ia(ia)
 
 
 # =========================
@@ -35,7 +79,7 @@ def clasificar(asset, prob_min):
 # =========================
 def bot():
 
-    print("🚀 BOT IA RENTABLE ACTIVADO")
+    print("🚀 BOT HEDGE FUND IA ACTIVADO")
 
     while True:
         try:
@@ -44,9 +88,6 @@ def bot():
 
             candidatos = []
             precios = {}
-
-            # IA decide exigencia
-            prob_min = portfolio.ajustar_filtro()
 
             # =========================
             # SCAN
@@ -60,15 +101,9 @@ def bot():
 
                 precios[symbol] = data["precio"]
 
-                tipo = clasificar(data, prob_min)
-
-                if tipo is None:
-                    continue
-
-                data["score_final"] = score(data)
-                data["tipo"] = tipo
-
-                candidatos.append(data)
+                if es_valido(data):
+                    data["score_final"] = score(data)
+                    candidatos.append(data)
 
             # =========================
             # ACTUALIZAR POSICIONES
@@ -78,7 +113,31 @@ def bot():
             # =========================
             # ORDENAR
             # =========================
-            candidatos = sorted(candidatos, key=lambda x: x["score_final"], reverse=True)
+            candidatos = sorted(
+                candidatos,
+                key=lambda x: x["score_final"],
+                reverse=True
+            )
+
+            # =========================
+            # 🔥 CIERRE INTELIGENTE
+            # =========================
+            for symbol, pos in list(portfolio.posiciones.items()):
+
+                precio_actual = precios.get(symbol, pos["entry"])
+                pnl = (precio_actual - pos["entry"]) / pos["entry"]
+
+                # take profit
+                if pnl > 0.012:
+                    print(f"🟢 TP {symbol} {round(pnl,4)}")
+                    portfolio.cerrar(symbol, precio_actual, pnl)
+                    ia["wins"] += 1
+
+                # stop loss
+                elif pnl < -0.01:
+                    print(f"🔴 SL {symbol} {round(pnl,4)}")
+                    portfolio.cerrar(symbol, precio_actual, pnl)
+                    ia["losses"] += 1
 
             # =========================
             # ROTACIÓN INTELIGENTE
@@ -95,20 +154,18 @@ def bot():
                         peor_prob = pos["prob"]
                         peor_symbol = s
 
-                if mejor["prob"] > peor_prob + config.ROTACION_UMBRAL:
-                    print(f"🔄 ROTACIÓN {peor_symbol} → {mejor['symbol']}")
-
+                if mejor["prob"] > peor_prob + 0.08:
+                    print(f"🔄 ROTANDO {peor_symbol} → {mejor['symbol']}")
                     portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
 
                     portfolio.comprar(
                         mejor["symbol"],
                         mejor["precio"],
-                        mejor["prob"],
-                        mejor["tipo"]
+                        mejor["prob"]
                     )
 
             # =========================
-            # LLENAR PORTAFOLIO
+            # LLENAR POSICIONES
             # =========================
             espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
 
@@ -124,9 +181,13 @@ def bot():
                     portfolio.comprar(
                         asset["symbol"],
                         asset["precio"],
-                        asset["prob"],
-                        asset["tipo"]
+                        asset["prob"]
                     )
+
+            # =========================
+            # IA UPDATE
+            # =========================
+            ajustar_ia()
 
             # =========================
             # LOGS
@@ -134,8 +195,8 @@ def bot():
             print(f"💰 Capital: {round(portfolio.capital,2)}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
             print(f"📈 Candidatos: {len(candidatos)}")
-            print(f"🧠 IA Win/Loss: {portfolio.win}/{portfolio.loss}")
-            print(f"🎯 Prob mínima: {prob_min}")
+            print(f"🧠 IA Win/Loss: {ia['wins']}/{ia['losses']}")
+            print(f"🎯 Prob mínima: {round(ia['prob_min'],2)}")
 
             time.sleep(config.CYCLE_TIME)
 
