@@ -16,15 +16,32 @@ from portfolio import portfolio
 app = Flask(__name__)
 
 
+# =========================
+# FILTRO DINÁMICO
+# =========================
+def es_valido(score, mercado):
+
+    if mercado == "bull":
+        return score > 0.60
+    elif mercado == "lateral":
+        return score > 0.52
+    else:
+        return score > 0.58
+
+
 def tipo_trade(score):
-    if score > 0.7:
+
+    if score > 0.75:
         return "elite"
-    return "normal"
+    elif score > 0.65:
+        return "bueno"
+    else:
+        return "normal"
 
 
 def bot():
 
-    print("🚀 BOT QUANT V3 ACTIVADO")
+    print("🚀 BOT IA INSTITUCIONAL V3.2")
 
     while True:
         try:
@@ -33,12 +50,8 @@ def bot():
 
             candidatos = []
             precios_dict = {}
-
             features_list = []
 
-            # =========================
-            # DATA + FEATURES
-            # =========================
             for symbol in universo:
 
                 data = obtener_multi_timeframe(symbol)
@@ -47,14 +60,11 @@ def bot():
                     continue
 
                 features = calcular_features(data)
-
                 precio = data["5m"]["close"].iloc[-1]
 
                 precios_dict[symbol] = data["5m"]["close"].values
 
-                # ML
                 ml_prob = ml_model.predict(features)
-
                 score = calcular_score(features, ml_prob)
 
                 features_list.append(features)
@@ -66,10 +76,12 @@ def bot():
                     "score": score
                 })
 
-            # =========================
-            # MERCADO
-            # =========================
             mercado = detectar_regimen(features_list)
+
+            # =========================
+            # FILTRO INTELIGENTE
+            # =========================
+            candidatos = [c for c in candidatos if es_valido(c["score"], mercado)]
 
             # =========================
             # SELECCIÓN
@@ -77,13 +89,13 @@ def bot():
             seleccionados = seleccionar_activos(
                 candidatos,
                 precios_dict,
-                config.MAX_POSICIONES
+                config.MAX_POSICIONES * 2
             )
 
             # =========================
             # ROTACIÓN
             # =========================
-            rotacion = evaluar_rotacion(portfolio, seleccionados)
+            rotacion = evaluar_rotacion(portfolio, seleccionados, mercado)
 
             if rotacion:
                 portfolio.cerrar(
@@ -103,7 +115,7 @@ def bot():
                 )
 
             # =========================
-            # LLENAR PORTAFOLIO
+            # LLENAR POSICIONES
             # =========================
             for asset in seleccionados:
 
@@ -129,6 +141,7 @@ def bot():
 
             print(f"💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
+            print(f"📈 Candidatos: {len(candidatos)}")
             print(f"🌍 Mercado: {mercado}")
 
             time.sleep(config.CYCLE_TIME)
