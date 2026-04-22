@@ -1,6 +1,6 @@
 import time
 import config
-from ia_model import registrar_trade
+from ml_v3.model import ml_model
 
 
 class Portfolio:
@@ -12,19 +12,12 @@ class Portfolio:
         self.posiciones = {}
         self.historial = []
 
-        self.win = 0
-        self.loss = 0
-
         self.cooldowns = {}
 
     def capital_disponible(self):
         return self.capital * (1 - config.RESERVA_CAPITAL)
 
-    def comprar(self, symbol, precio, prob, tipo):
-
-        if symbol in self.cooldowns:
-            if time.time() < self.cooldowns[symbol]:
-                return False
+    def comprar(self, symbol, precio, features, score, tipo):
 
         if symbol in self.posiciones:
             return False
@@ -49,7 +42,8 @@ class Portfolio:
             "entry": precio,
             "cantidad": cantidad,
             "inversion": inversion,
-            "prob": prob,
+            "features": features,
+            "score": score,
             "tipo": tipo,
             "time": time.time(),
             "max_price": precio
@@ -92,15 +86,8 @@ class Portfolio:
         valor = pos["cantidad"] * precio
         self.capital += valor
 
-        if pnl > 0:
-            self.win += 1
-        else:
-            self.loss += 1
-
-        registrar_trade({
-            "prob": pos["prob"],
-            "tipo": pos["tipo"]
-        }, pnl)
+        # 🔥 IA APRENDE AQUÍ
+        ml_model.add_sample(pos["features"], pnl)
 
         self.historial.append({
             "symbol": symbol,
@@ -110,21 +97,19 @@ class Portfolio:
             "tipo": pos["tipo"]
         })
 
-        self.cooldowns[symbol] = time.time() + config.COOLDOWN_SYMBOL
-
         print(f"🔴 SELL {symbol} pnl {round(pnl,4)}")
 
     def peor_posicion(self):
 
         peor_symbol = None
-        peor_prob = 999
+        peor_score = 999
 
         for s, pos in self.posiciones.items():
-            if pos["prob"] < peor_prob:
-                peor_prob = pos["prob"]
+            if pos["score"] < peor_score:
+                peor_score = pos["score"]
                 peor_symbol = s
 
-        return peor_symbol, peor_prob
+        return peor_symbol, peor_score
 
     def data(self):
 
@@ -136,9 +121,7 @@ class Portfolio:
             "pnl": round(pnl_total, 2),
             "pnl_pct": round((pnl_total / self.capital_inicial) * 100, 2),
             "posiciones": self.posiciones,
-            "historial": self.historial[-200:],
-            "win": self.win,
-            "loss": self.loss
+            "historial": self.historial[-200:]
         }
 
 
