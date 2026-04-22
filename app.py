@@ -3,129 +3,132 @@ import threading
 import time
 import config
 
-from services.scanner import analizar
+from services_v3.data_engine import obtener_multi_timeframe, obtener_universo
+from services_v3.features import calcular_features
+from services_v3.market_regime import detectar_regimen
+from services_v3.ranker import calcular_score
+from services_v3.selector import seleccionar_activos
+from services_v3.rotation import evaluar_rotacion
+
+from ml_v3.model import ml_model
 from portfolio import portfolio
-from ia_model import score_ia
 
 app = Flask(__name__)
 
 
-def score(asset):
-    return (asset["prob"] * 0.7) + ((asset["score"] / 3) * 0.3)
-
-
-def tipo_trade(asset):
-    if asset["prob"] >= 0.85:
+def tipo_trade(score):
+    if score > 0.7:
         return "elite"
     return "normal"
 
 
-def detectar_mercado(candidatos):
-
-    if not candidatos:
-        return "neutral"
-
-    avg = sum(c["prob"] for c in candidatos) / len(candidatos)
-
-    if avg > 0.75:
-        return "bull"
-
-    if avg < 0.6:
-        return "bear"
-
-    return "lateral"
-
-
 def bot():
 
-    print("🚀 BOT IA INSTITUCIONAL REAL")
+    print("🚀 BOT QUANT V3 ACTIVADO")
 
     while True:
         try:
 
-            print("\n🔎 Analizando mercado...")
+            universo = obtener_universo()
 
             candidatos = []
-            precios = {}
+            precios_dict = {}
 
-            for symbol in config.CRYPTOS:
+            features_list = []
 
-                data = analizar(symbol)
+            # =========================
+            # DATA + FEATURES
+            # =========================
+            for symbol in universo:
+
+                data = obtener_multi_timeframe(symbol)
 
                 if data is None:
                     continue
 
-                precios[symbol] = data["precio"]
+                features = calcular_features(data)
 
-                data["score_final"] = score(data)
-                data["tipo"] = tipo_trade(data)
+                precio = data["5m"]["close"].iloc[-1]
 
-                candidatos.append(data)
+                precios_dict[symbol] = data["5m"]["close"].values
 
-            portfolio.actualizar(precios)
+                # ML
+                ml_prob = ml_model.predict(features)
 
-            mercado = detectar_mercado(candidatos)
+                score = calcular_score(features, ml_prob)
 
-            filtrados = []
+                features_list.append(features)
 
-            for asset in candidatos:
-
-                ia = score_ia({
-                    "prob": asset["prob"],
-                    "tipo": asset["tipo"]
+                candidatos.append({
+                    "symbol": symbol,
+                    "precio": precio,
+                    "features": features,
+                    "score": score
                 })
 
-                if mercado == "bull" and ia > 0.45:
-                    filtrados.append(asset)
+            # =========================
+            # MERCADO
+            # =========================
+            mercado = detectar_regimen(features_list)
 
-                elif mercado == "lateral" and ia > 0.55:
-                    filtrados.append(asset)
+            # =========================
+            # SELECCIÓN
+            # =========================
+            seleccionados = seleccionar_activos(
+                candidatos,
+                precios_dict,
+                config.MAX_POSICIONES
+            )
 
-                elif mercado == "bear" and ia > 0.65:
-                    filtrados.append(asset)
-
-            candidatos = sorted(filtrados, key=lambda x: x["score_final"], reverse=True)
-
+            # =========================
             # ROTACIÓN
-            if portfolio.posiciones and candidatos:
+            # =========================
+            rotacion = evaluar_rotacion(portfolio, seleccionados)
 
-                mejor = candidatos[0]
-                peor_symbol, peor_prob = portfolio.peor_posicion()
+            if rotacion:
+                portfolio.cerrar(
+                    rotacion["salir"],
+                    precios_dict[rotacion["salir"]][-1],
+                    0
+                )
 
-                if mejor["prob"] > peor_prob + config.ROTACION_UMBRAL:
-                    print(f"🔄 ROTACIÓN {peor_symbol} → {mejor['symbol']}")
+                nuevo = rotacion["entrar"]
 
-                    portfolio.cerrar(peor_symbol, precios.get(peor_symbol, 0), 0)
+                portfolio.comprar(
+                    nuevo["symbol"],
+                    nuevo["precio"],
+                    nuevo["features"],
+                    nuevo["score"],
+                    tipo_trade(nuevo["score"])
+                )
 
-                    portfolio.comprar(
-                        mejor["symbol"],
-                        mejor["precio"],
-                        mejor["prob"],
-                        mejor["tipo"]
-                    )
-
+            # =========================
             # LLENAR PORTAFOLIO
-            espacios = config.MAX_POSICIONES - len(portfolio.posiciones)
+            # =========================
+            for asset in seleccionados:
 
-            if espacios > 0:
+                if len(portfolio.posiciones) >= config.MAX_POSICIONES:
+                    break
 
-                print(f"📈 Llenando {espacios} posiciones")
+                portfolio.comprar(
+                    asset["symbol"],
+                    asset["precio"],
+                    asset["features"],
+                    asset["score"],
+                    tipo_trade(asset["score"])
+                )
 
-                for asset in candidatos:
+            # =========================
+            # UPDATE
+            # =========================
+            precios_actuales = {
+                s: precios_dict[s][-1] for s in precios_dict
+            }
 
-                    if len(portfolio.posiciones) >= config.MAX_POSICIONES:
-                        break
+            portfolio.actualizar(precios_actuales)
 
-                    portfolio.comprar(
-                        asset["symbol"],
-                        asset["precio"],
-                        asset["prob"],
-                        asset["tipo"]
-                    )
-
-            print(f"💰 Capital: {round(portfolio.capital,2)}")
+            print(f"💰 Capital: {portfolio.capital}")
             print(f"📊 Posiciones: {list(portfolio.posiciones.keys())}")
-            print(f"📈 Candidatos: {len(candidatos)}")
             print(f"🌍 Mercado: {mercado}")
 
             time.sleep(config.CYCLE_TIME)
