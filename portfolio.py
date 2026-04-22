@@ -12,11 +12,12 @@ class Portfolio:
         self.posiciones = {}
         self.historial = []
 
-        self.cooldowns = {}
-
     def capital_disponible(self):
         return self.capital * (1 - config.RESERVA_CAPITAL)
 
+    # =========================
+    # COMPRA DINÁMICA
+    # =========================
     def comprar(self, symbol, precio, features, score, tipo):
 
         if symbol in self.posiciones:
@@ -27,10 +28,13 @@ class Portfolio:
 
         capital_disp = self.capital_disponible()
 
-        if tipo == "elite":
-            inversion = capital_disp * config.RIESGO_ELITE
+        # 🔥 ASIGNACIÓN INTELIGENTE
+        if score > 0.75:
+            inversion = capital_disp * 0.18
+        elif score > 0.65:
+            inversion = capital_disp * 0.12
         else:
-            inversion = capital_disp * config.RIESGO_NORMAL
+            inversion = capital_disp * 0.08
 
         if inversion <= 10 or inversion > self.capital:
             return False
@@ -49,10 +53,13 @@ class Portfolio:
             "max_price": precio
         }
 
-        print(f"🟢 BUY {symbol} ${round(inversion,2)}")
+        print(f"🟢 BUY {symbol} ${round(inversion,2)} score {round(score,2)}")
 
         return True
 
+    # =========================
+    # GESTIÓN (TP + SL REAL)
+    # =========================
     def actualizar(self, precios):
 
         for s in list(self.posiciones.keys()):
@@ -65,20 +72,33 @@ class Portfolio:
 
             pnl = (precio - pos["entry"]) / pos["entry"]
 
+            # actualizar máximo
             if precio > pos["max_price"]:
                 pos["max_price"] = precio
 
-            trailing = pos["max_price"] * 0.985
+            # =========================
+            # 🔥 TRAILING PROFIT
+            # =========================
+            trailing_pct = 0.01  # 1% caída desde el máximo
 
-            if pnl > 0.012:
+            trailing_price = pos["max_price"] * (1 - trailing_pct)
+
+            # =========================
+            # 🔻 STOP LOSS
+            # =========================
+            if pnl <= -0.01:
+                self.cerrar(s, precio, pnl)
+                continue
+
+            # =========================
+            # 🔥 TAKE PROFIT INTELIGENTE
+            # =========================
+            if precio < trailing_price and pnl > 0:
                 self.cerrar(s, precio, pnl)
 
-            elif pnl < -0.015:
-                self.cerrar(s, precio, pnl)
-
-            elif precio < trailing:
-                self.cerrar(s, precio, pnl)
-
+    # =========================
+    # CIERRE
+    # =========================
     def cerrar(self, symbol, precio, pnl):
 
         pos = self.posiciones.pop(symbol)
@@ -86,7 +106,7 @@ class Portfolio:
         valor = pos["cantidad"] * precio
         self.capital += valor
 
-        # 🔥 IA APRENDE AQUÍ
+        # IA aprende
         ml_model.add_sample(pos["features"], pnl)
 
         self.historial.append({
