@@ -1,15 +1,6 @@
-import config
+def evaluar_rotacion(portfolio, candidatos, mercado):
 
-
-# =========================
-# ROTACIÓN INSTITUCIONAL
-# =========================
-def evaluar_rotacion(portfolio, candidatos):
-
-    if not portfolio.posiciones:
-        return None
-
-    if not candidatos:
+    if not portfolio.posiciones or not candidatos:
         return None
 
     mejor = candidatos[0]
@@ -18,21 +9,24 @@ def evaluar_rotacion(portfolio, candidatos):
     peor_score = 999
 
     for s, pos in portfolio.posiciones.items():
-
-        score = pos.get("score", 0)
-
-        if score < peor_score:
-            peor_score = score
+        if pos["score"] < peor_score:
+            peor_score = pos["score"]
             peor_symbol = s
 
     if peor_symbol is None:
         return None
 
-    # =========================
-    # CONDICIÓN DE ROTACIÓN
-    # =========================
-    if mejor["score"] > peor_score * (1 + config.ROTACION_UMBRAL):
+    # 🔥 ROTAR SOLO SI VALE LA PENA
+    mejora = mejor["score"] - peor_score
 
+    if mercado == "bull":
+        umbral = 0.06
+    elif mercado == "lateral":
+        umbral = 0.04
+    else:
+        umbral = 0.03
+
+    if mejora > umbral:
         return {
             "salir": peor_symbol,
             "entrar": mejor
