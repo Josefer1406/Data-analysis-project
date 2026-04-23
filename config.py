@@ -13,7 +13,7 @@ MAX_POSICIONES = 4
 CAPITAL_INICIAL = 1000
 RESERVA_CAPITAL = 0.40
 
-# Tamaño por trade
+# Tamaño por trade (base)
 RIESGO_ELITE = 0.15
 RIESGO_NORMAL = 0.10
 
@@ -36,7 +36,14 @@ VOLATILIDAD_LIMITE = 0.05
 VOLATILIDAD_MIN = 0.001
 
 # =========================
-# UNIVERSO OKX (VALIDADO)
+# FILTRO DINÁMICO NUEVO
+# =========================
+SCORE_BULL = 0.58
+SCORE_LATERAL = 0.50
+SCORE_BEAR = 0.48   # 🔥 clave para que NO se congele
+
+# =========================
+# UNIVERSO OKX
 # =========================
 CRYPTOS = [
     "BTC/USDT",
