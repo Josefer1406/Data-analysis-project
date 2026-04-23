@@ -17,23 +17,25 @@ app = Flask(__name__)
 
 
 # =========================
-# FILTRO DINÁMICO
+# FILTRO DINÁMICO REAL
 # =========================
 def es_valido(score, mercado):
 
     if mercado == "bull":
-        return score > 0.60
+        return score > config.SCORE_BULL
+
     elif mercado == "lateral":
-        return score > 0.52
+        return score > config.SCORE_LATERAL
+
     else:
-        return score > 0.58
+        return score > config.SCORE_BEAR
 
 
 def tipo_trade(score):
 
-    if score > 0.75:
+    if score > 0.78:
         return "elite"
-    elif score > 0.65:
+    elif score > 0.70:
         return "bueno"
     else:
         return "normal"
@@ -41,7 +43,7 @@ def tipo_trade(score):
 
 def bot():
 
-    print("🚀 BOT IA INSTITUCIONAL V3.2")
+    print("🚀 BOT IA INSTITUCIONAL V3.3")
 
     while True:
         try:
@@ -52,6 +54,9 @@ def bot():
             precios_dict = {}
             features_list = []
 
+            # =========================
+            # DATA + FEATURES
+            # =========================
             for symbol in universo:
 
                 data = obtener_multi_timeframe(symbol)
@@ -79,7 +84,7 @@ def bot():
             mercado = detectar_regimen(features_list)
 
             # =========================
-            # FILTRO INTELIGENTE
+            # FILTRO
             # =========================
             candidatos = [c for c in candidatos if es_valido(c["score"], mercado)]
 
@@ -93,7 +98,7 @@ def bot():
             )
 
             # =========================
-            # ROTACIÓN
+            # ROTACIÓN (SOLO SI MEJORA)
             # =========================
             rotacion = evaluar_rotacion(portfolio, seleccionados, mercado)
 
