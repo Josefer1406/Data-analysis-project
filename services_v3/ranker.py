@@ -1,45 +1,46 @@
 import numpy as np
 
 
-# =========================
-# NORMALIZACIÓN
-# =========================
-def normalizar(x, min_val=-0.05, max_val=0.05):
-
-    if x is None:
-        return 0
-
-    x = max(min(x, max_val), min_val)
-
-    return (x - min_val) / (max_val - min_val)
-
-
-# =========================
-# SCORE CUANT REAL
-# =========================
 def calcular_score(features, ml_prob=0.5):
 
-    m5 = normalizar(features["momentum_5"])
-    m15 = normalizar(features["momentum_15"])
-    m1h = normalizar(features["momentum_1h"])
+    m5 = features["momentum_5"]
+    m15 = features["momentum_15"]
+    m1h = features["momentum_1h"]
 
-    trend = normalizar(features["trend"])
+    trend = features["trend"]
     vol_ratio = min(features["vol_ratio"], 3) / 3
-    volatility = 1 - min(features["volatility"], 0.05) / 0.05
+    volatility = features["volatility"]
 
     # =========================
-    # COMBINACIÓN INSTITUCIONAL
+    # 🔥 FILTRO DE CALIDAD REAL
     # =========================
-    score = (
-        0.25 * m5 +
-        0.25 * m15 +
-        0.20 * m1h +
-        0.10 * trend +
-        0.10 * vol_ratio +
-        0.10 * volatility
+    if m5 < 0 or m15 < 0:
+        return 0  # evita basura total
+
+    # =========================
+    # 🔥 SCORE DE MOMENTUM REAL
+    # =========================
+    momentum_score = (
+        (m5 * 0.4) +
+        (m15 * 0.35) +
+        (m1h * 0.25)
     )
 
-    # ajuste por ML
-    score = (score * 0.7) + (ml_prob * 0.3)
+    # =========================
+    # 🔥 PENALIZACIÓN POR VOLATILIDAD MALA
+    # =========================
+    if volatility > 0.04:
+        momentum_score *= 0.7
+
+    # =========================
+    # 🔥 BONUS POR TENDENCIA
+    # =========================
+    if trend > 0:
+        momentum_score *= 1.2
+
+    # =========================
+    # 🔥 ML COMO CONFIRMACIÓN
+    # =========================
+    score = (momentum_score * 0.75) + (ml_prob * 0.25)
 
     return float(score)
