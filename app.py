@@ -22,13 +22,13 @@ app = Flask(__name__)
 def es_valido(score, mercado):
 
     if mercado == "bull":
-        return score > config.SCORE_BULL
+        return score > 0.55
 
     elif mercado == "lateral":
-        return score > config.SCORE_LATERAL
+        return score > 0.52
 
     else:
-        return score > config.SCORE_BEAR
+        return score > 0.50
 
 
 def tipo_trade(score):
